@@ -725,11 +725,12 @@ function vScan(o={}){
   $$('[data-cont]').forEach(e=>e.onclick=()=>{REC=OPN.find(r=>r.id===e.dataset.cont);if(REC.fin)result(REC);else scanUI();});
   $$('[data-a]').forEach(e=>e.onclick=()=>chooseScope(e.dataset.a));}
 const GRP_SUB=/^J060[12]/; // panadería (a granel, empacada) y pastelería (fresca, seca) se escanean por grupo
+const GRP_OUT=/^J06020209/; // Complementos (velas) va aparte, fuera de Pastelería seca
 function chooseScope(aid,pl){const a=S.aisles().find(x=>x.id===aid);if(!a){go('scan');return;}
   const now=Date.now();let TL;try{TL=pl&&pl.length?pl.filter(c=>a.cats.includes(c)):semRows().filter(x=>x.a.id===aid&&todayHas(x.a,x.c,now)).map(x=>x.c);}catch(e){TL=[];}TL=srt([...new Set(TL)]).filter(c=>CLS_CNT.get(c));
   const LBC=latestByClass(0);const dToday=c=>{const r=LBC.get(aid+'|'+c);return r&&dayN(r.end)===dayN(now);};
   const opR=c=>S.recs().find(r=>r.open&&r.userId===ME.id&&r.aisleId===aid&&r.classes.length===1&&r.classes[0]===c);
-  const TU=[];const gi=new Map();for(const c of TL){const s=CLS_SUB.get(c)||'';if(GRP_SUB.test(s)){if(!gi.has(s)){gi.set(s,TU.length);TU.push({s,cls:[]});}TU[gi.get(s)].cls.push(c);}else TU.push({cls:[c]});}
+  const TU=[];const gi=new Map();for(const c of TL){const s=CLS_SUB.get(c)||'';if(GRP_SUB.test(s)&&!GRP_OUT.test(c)){if(!gi.has(s)){gi.set(s,TU.length);TU.push({s,cls:[]});}TU[gi.get(s)].cls.push(c);}else TU.push({cls:[c]});}
   const opU=L=>{const k=[...L].sort().join('|');return S.recs().find(r=>r.open&&r.userId===ME.id&&r.aisleId===aid&&[...r.classes].sort().join('|')===k);};
   const todayH=TU.length?`<div class="sec">Hoy toca en este pasillo (${TU.length})</div><div class="sub" style="margin:0 2px 6px">Toca una para escanear solo sus códigos.</div><div class="card" style="padding:4px 14px">${TU.map((u,i)=>{const ok=u.cls.every(dToday),o=opU(u.cls);const n=u.cls.reduce((s,c)=>s+(CLS_CNT.get(c)||0),0);return `<div class="act" data-tu="${i}"><div class="ic ${ok?'g':o?'y':'r'}" style="font-size:${ok?18:13}px;font-weight:800">${ok?'✓':o?'📷':'•'}</div><div class="grow"><div class="t">${esc(short(u.s||u.cls[0]))}</div><div class="s">${u.s?u.cls.length+' clases':esc(u.cls[0].split('-')[0])} · ${fmt(n)} productos${ok?' · <b style="color:var(--g)">hecha hoy</b>':o?' · <b style="color:#c2410c">en proceso</b>':''}</div></div><div class="ch">›</div></div>`;}).join('')}</div>`:'';
   const cls=srt(a.cats).filter(c=>CLS_CNT.get(c));const isNF=cls.some(c=>/^J(0[3-7]|08|09|10|11)/.test(CLS_DIV.get(c)||''));const subs=new Map();for(const c of cls){const s=CLS_SUB.get(c)||'Otros';if(!subs.has(s))subs.set(s,[]);subs.get(s).push(c);}
@@ -896,7 +897,7 @@ function recLbl(r){if(!r||!r.cls)return '';const C=r.classes||[];if(r.grp!=='pla
   return (S.length&&S.length<=2?S.map(lc).join(' y '):D.length&&D.length<=2?D.map(lc).join(' y '):short(C[0])+', '+short(C[1])+'…')+' · '+C.length+' clases';}
 function planRec(aid,cls){const a=S.aisles().find(x=>x.id===aid);if(!a)return chooseScope(aid);cls=cls.filter(c=>a.cats.includes(c));if(!cls.length)return chooseScope(aid);
   const key=[...cls].sort().join('|');const op=S.recs().find(r=>r.open&&r.userId===ME.id&&r.aisleId===aid&&[...r.classes].sort().join('|')===key);if(op){REC=op;if(op.fin)return result(op);return scanUI();}
-  const subs=[...new Set(cls.map(c=>CLS_SUB.get(c)||''))];const full=subs.length===1&&subs[0]&&a.cats.filter(c=>CLS_CNT.get(c)&&CLS_SUB.get(c)===subs[0]).every(c=>cls.includes(c));
+  const subs=[...new Set(cls.map(c=>CLS_SUB.get(c)||''))];const full=subs.length===1&&subs[0]&&a.cats.filter(c=>CLS_CNT.get(c)&&CLS_SUB.get(c)===subs[0]&&!(GRP_OUT.test(c)&&!cls.includes(c))).every(c=>cls.includes(c));
   const one=cls.length===1;const lbl=one?cls[0]:full&&cls.length>1?subs[0]:cls.map(short).join(', ');
   REC={id:uid(),aisleId:a.id,aisleName:a.name,aisleDesc:a.desc||'',cls:lbl,grp:one?undefined:full?'sub':'plan',classes:[...cls],rep:{},userId:ME.id,userName:ME.name,start:Date.now(),end:null,open:true,scans:{},rej:[],falt:[],pres:0,plan:0,upd:Date.now()};
   const R=S.recs();R.unshift(REC);S.setRecs(R);REC._auto=1;scanUI();}
