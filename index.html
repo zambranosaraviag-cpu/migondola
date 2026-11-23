@@ -528,7 +528,7 @@ function vHome(){const A=S.aisles().filter(a=>a.active!==false);const L=latestBy
   const today=new Date().toLocaleDateString('es-PE',{weekday:'long',day:'numeric',month:'long'});
   const byA=new Map();for(const p of pend){const k=p.a.name;byA.set(k,(byA.get(k)||0)+1);}
   const open=S.recs().filter(r=>r.open&&r.userId===ME.id);
-  $('#main').innerHTML=`<div class="sub" style="margin-top:4px">🛒 MiGondola · ${esc(HOME_LOCAL)}</div><h1>Hola, ${esc(ME.name.split(' ')[0])}</h1><div class="sub" style="text-transform:capitalize">${today}</div>${profBanner()}${todayCard(1)}
+  $('#main').innerHTML=`<div class="sub" style="margin-top:4px">🛒 MiGondola · ${esc(HOME_LOCAL)}</div><h1>Hola, ${esc(ME.name.split(' ')[0])}</h1><div class="sub" style="text-transform:capitalize">${today}</div>${profBanner()}${todayCard(1)}${weekTable()}
   ${open.length?`<div class="card" style="border:1px solid var(--amb)"><b>Tienes ${open.length} recorrida(s) abierta(s)</b><div class="sub">${open.map(r=>esc(r.aisleName)+(r.cls?' · '+esc(short(r.cls)):'')).join(', ')}</div><button class="btn pri sm" id="hCont" style="margin-top:8px">📷 Seguir escaneando</button></div>`:''}
   <div class="sec">Resumen</div>
   <div class="card kp"><div><div class="kpi" style="padding:4px"><div class="v">${fmt(PR.filter(x=>x.act).length)}</div><div class="l">Productos activos</div></div></div>
@@ -574,7 +574,7 @@ $('#fileBk').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!
 function vAis(){if(!isAdmin()){go('home');return;}const A=S.aisles();
   $('#main').innerHTML=`<h1>Pasillos</h1><div class="card sub">Define los pasillos y asigna qué productos deben estar en cada uno. Ese "plan" es lo que la app compara contra lo escaneado.</div>
   ${A.map(a=>{const n=planOf(a).length;return `<div class="card"><div class="row"><div class="grow"><div style="font-weight:600">${esc(a.name)}</div><div class="sub">${esc(a.desc||'')}${a.desc?' · ':''}${fmt(n)} en el plan · ${a.cats.length} clase(s)</div></div><span class="badge ${a.active===false?'off':''}">${a.active===false?'inactivo':'activo'}</span></div>
-    ${act('📷','g','Escanear este pasillo','','s_'+a.id)}${act('🗂️','y','Asignar productos','Por clase o subdepartamento','p_'+a.id)}${act('📅','b','Días de revisión',(FREQ[planA(a).f]||FREQ.s1).t+' · '+planA(a).days.map(d=>DIAS[d]).join(', '),'c_'+a.id)}${act('✏️','v','Editar pasillo','Código, nombre, desactivar o borrar','e_'+a.id)}
+    ${act('📷','g','Escanear este pasillo','','s_'+a.id)}${act('🗂️','y','Asignar productos','Por clase o subdepartamento','p_'+a.id)}${act('📅','b','Días de revisión','Por clase · '+((a.plan&&a.plan.days)||[]).map(d=>DIAS[d]).join(', '),'c_'+a.id)}${act('✏️','v','Editar pasillo','Código, nombre, desactivar o borrar','e_'+a.id)}
     ${act(a.active===false?'▶️':'⏸️','o',a.active===false?'Activar':'Desactivar','','t_'+a.id)}${act('🗑️','r','Borrar pasillo','','d_'+a.id,1)}</div>`}).join('')||'<div class="card empty">Todavía no hay pasillos. Crea el primero, por ejemplo "BASICOS" con las clases Aceites, Arroz, Pastas…</div>'}
   <button class="btn pri big" id="aNew" style="margin-top:6px">＋ Nuevo pasillo</button>
   ${!A.length?'<button class="btn big" id="aAuto" style="margin-top:8px">Crear un pasillo por departamento (para empezar rápido)</button>':''}`;
@@ -732,28 +732,53 @@ async function shareRec(r){const alm=r.falt.filter(f=>f.oh>0),pnd=sortFalt(pendO
   try{if(navigator.share){await navigator.share({text:t});return;}}catch(e){if(e.name==='AbortError')return;}
   try{await navigator.clipboard.writeText(t);toast('Lista copiada: pégala en WhatsApp','ok');}catch(e){window.open('https://wa.me/?text='+encodeURIComponent(t));}}
 
-/* ================= PLAN SEMANAL ================= */
+/* ================= PLAN SEMANAL (por clase) ================= */
 const DIAS=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'],DIASL=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
-const FREQ={d:{t:'Todos los días',g:1,lim:2},s2:{t:'2 veces por semana',g:2,lim:4},s1:{t:'1 vez por semana',g:4,lim:7}};
-function defPlan(name){const m=String(name).match(/Pasillo\s*(\d+)/i);const n=m?+m[1]:(/caja/i.test(name)?-1:0);
-  if(n>=10&&n<=16)return {f:'d',days:[1,2,3,4,5,6]};if([1,2,3].includes(n))return {f:'s2',days:[1,4]};if([4,7].includes(n))return {f:'s2',days:[2,5]};
-  const one={5:1,6:1,17:2,18:2,8:3,9:3,'-1':3,19:3,20:4,21:5,22:5};return {f:'s1',days:[one[n]||6]};}
-function planA(a){return a.plan||defPlan(a.name);}
-function ensurePlan(){try{if(!ME||!isAdmin())return;const A=S.aisles();if(!A.length||A.some(a=>a.plan))return;for(const a of A)a.plan=defPlan(a.name);S.setAisles(A);}catch(e){}}
-setTimeout(ensurePlan,8000);document.addEventListener('click',e=>{const b=e.target.closest('[data-goa]');if(b)go('scan',{aisle:b.dataset.goa});});setInterval(ensurePlan,300000);
+const KLIM={2:{t:'2 veces por semana',g:2,lim:4},1:{t:'1 vez por semana',g:4,lim:7},0.5:{t:'cada 2 semanas',g:8,lim:14}};
+const wkPar=ts=>Math.floor((dayN(ts)/864e5+3)/7)%2;
+const PERE=/^J0[3-7]/;
+function clsVel(c){let v=0;for(const x of PR)if(x.cla===c&&x.act&&x.oh>0)v+=x.vel;return v;}
+function genPlan(cap){cap=cap||LS.get('planCap',1600);const A=S.aisles().filter(a=>a.active!==false);const items=[];
+  const vel=new Map();for(const x of PR)if(x.act&&x.oh>0)vel.set(x.cla,(vel.get(x.cla)||0)+x.vel);
+  for(const a of A)for(const c of a.cats){const n=CLS_CNT.get(c)||0;if(!n)continue;items.push({a,c,n,v:vel.get(c)||0,k:1,pe:PERE.test(CLS_DIV.get(c)||'')});}
+  const W=()=>items.reduce((s,x)=>s+x.n*x.k,0),CAPW=cap*6;
+  if(W()>CAPW){for(const x of [...items].sort((p,q)=>p.v/p.n-q.v/q.n)){if(W()<=CAPW)break;x.k=0.5;}}
+  else{for(const x of [...items].sort((p,q)=>(q.pe-p.pe)||(q.v/q.n-p.v/p.n))){if(W()+x.n>CAPW)continue;x.k=2;}}
+  // 12 cajones: día 1..6 x semana 0/1
+  const load={};for(let d=1;d<=6;d++)for(let w=0;w<2;w++)load[d+'|'+w]=0;
+  const fits=(ds,ws,n)=>ds.every(d=>ws.every(w=>load[d+'|'+w]+n<=cap));const put=(ds,ws,n)=>ds.forEach(d=>ws.forEach(w=>load[d+'|'+w]+=n));
+  const cost=(ds,ws)=>Math.max(...ds.flatMap(d=>ws.map(w=>load[d+'|'+w])));
+  const opts=k=>k===2?[[[1,4],[0,1]],[[2,5],[0,1]],[[3,6],[0,1]]]:k===1?[1,2,3,4,5,6].map(d=>[[d],[0,1]]):[1,2,3,4,5,6].flatMap(d=>[[[d],[0]],[[d],[1]]]);
+  const byA=new Map();for(const x of items){if(!byA.has(x.a.id))byA.set(x.a.id,[]);byA.get(x.a.id).push(x);}
+  const plan=new Map();
+  for(const [aid,L] of [...byA].sort((p,q)=>q[1].reduce((s,x)=>s+x.n*x.k,0)-p[1].reduce((s,x)=>s+x.n*x.k,0))){let pref=null;
+    for(const x of L.sort((p,q)=>q.k-p.k||q.n-p.n)){const O=opts(x.k);let best=null;
+      if(pref){const o=O.find(o=>o[0].includes(pref.d)&&(x.k!==0.5||o[1][0]===pref.w));if(o&&fits(o[0],o[1],x.n))best=o;}
+      if(!best)best=O.slice().sort((p,q)=>cost(p[0],p[1])-cost(q[0],q[1]))[0];
+      put(best[0],best[1],x.n);if(!pref)pref={d:best[0][0],w:best[1][0]};
+      if(!plan.has(aid))plan.set(aid,{});plan.get(aid)[x.c]={k:x.k,d:best[0],w:x.k===0.5?best[1][0]:null};}}
+  const AL=S.aisles();for(const a of AL){const cl=plan.get(a.id)||{};const ds=new Set();Object.values(cl).forEach(o=>o.d.forEach(d=>ds.add(d)));a.plan={cls:cl,days:[...ds].sort(),cap};}
+  LS.set('planCap',cap);S.setAisles(AL);return load;}
+function clsPlan(a,c){const o=a.plan&&a.plan.cls&&a.plan.cls[c];return o||{k:1,d:(a.plan&&a.plan.days&&a.plan.days.length?[a.plan.days[0]]:[1]),w:null};}
+function todayHas(a,c,ts){const o=clsPlan(a,c),d=new Date(ts||Date.now()).getDay();return o.d.includes(d)&&(o.w==null||o.w===wkPar(ts||Date.now()));}
+function ensurePlan(){try{if(!ME||!isAdmin()||!PR.length)return;const A=S.aisles();if(!A.length||A.some(a=>a.plan&&a.plan.cls))return;genPlan(LS.get('planCap',1600));}catch(e){console.log(e);}}
+setTimeout(ensurePlan,8000);setInterval(ensurePlan,300000);document.addEventListener('click',e=>{const b=e.target.closest('[data-goa]');if(b)go('scan',{aisle:b.dataset.goa});});
 const dayN=ts=>{const d=new Date(ts);d.setHours(0,0,0,0);return d.getTime();};
 function ageDays(ts){return Math.round((dayN(Date.now())-dayN(ts))/864e5);}
-function sem(a,r){if(!r)return 'r';const pl=FREQ[planA(a).f]||FREQ.s1,ag=ageDays(r.end);return ag<=pl.g?'g':ag<=pl.lim?'y':'r';}
+function sem(a,r,c){if(!r)return 'r';const pl=KLIM[clsPlan(a,c).k]||KLIM[1],ag=ageDays(r.end);return ag<=pl.g?'g':ag<=pl.lim?'y':'r';}
 const SEMC={g:'#16a34a',y:'#d97706',r:'#dc2626'};
-function semBadge(a,r){const s=sem(a,r);const txt=r?(ageDays(r.end)===0?'hoy':'hace '+ageDays(r.end)+' d'):'nunca';return `<span style="display:inline-block;min-width:64px;text-align:center;font-size:12px;font-weight:700;color:#fff;background:${SEMC[s]};border-radius:99px;padding:2px 8px">${s==='g'?'●':s==='y'?'▲':'■'} ${txt}</span>`;}
-function planSheet(aid){const L=S.aisles();const a=L.find(x=>x.id===aid);if(!a)return;const pl=planA(a);
-  const sh=sheet(`<h2>📅 Días de revisión</h2><div class="sub">${esc(a.name)}</div>
-   <label class="f">Frecuencia</label><select class="sel" id="plF">${Object.entries(FREQ).map(([k,v])=>`<option value="${k}" ${pl.f===k?'selected':''}>${v.t} (alerta roja a los ${v.lim} días sin revisar)</option>`).join('')}</select>
-   <label class="f">Días que toca</label><div class="chips">${[1,2,3,4,5,6,0].map(d=>`<button class="chip ${pl.days.includes(d)?'on':''}" data-pd="${d}">${DIAS[d]}</button>`).join('')}</div>
-   <div class="row" style="margin-top:16px"><button class="btn" id="plDef">Volver al plan recomendado</button><div class="grow"></div><button class="btn pri" id="plOk">Guardar</button></div>`);
-  sh.querySelectorAll('[data-pd]').forEach(b=>b.onclick=()=>b.classList.toggle('on'));
-  sh.querySelector('#plDef').onclick=()=>{a.plan=defPlan(a.name);S.setAisles(L);sh.remove();toast('Plan recomendado aplicado','ok');go(VIEW);};
-  sh.querySelector('#plOk').onclick=()=>{const days=[...sh.querySelectorAll('[data-pd].on')].map(b=>+b.dataset.pd);if(!days.length){toast('Elige al menos un día','err');return;}a.plan={f:sh.querySelector('#plF').value,days};S.setAisles(L);sh.remove();toast('Días guardados','ok');go(VIEW);};}
+function semBadge(a,r,c){const s=sem(a,r,c);const txt=r?(ageDays(r.end)===0?'hoy':'hace '+ageDays(r.end)+' d'):'nunca';return `<span style="display:inline-block;min-width:64px;text-align:center;font-size:12px;font-weight:700;color:#fff;background:${SEMC[s]};border-radius:99px;padding:2px 8px">${s==='g'?'●':s==='y'?'▲':'■'} ${txt}</span>`;}
+function weekTable(){const A=S.aisles().filter(a=>a.active!==false);const wp=wkPar(Date.now()),wd=new Date().getDay();
+  const cell=(d,w)=>{const m=new Map();let n=0;for(const a of A)for(const c of a.cats){const k=CLS_CNT.get(c)||0;if(!k)continue;const o=clsPlan(a,c);if(!o.d.includes(d)||(o.w!=null&&o.w!==w))continue;n+=k;m.set(a.name,(m.get(a.name)||0)+1);}return {n,m};};
+  const has05=A.some(a=>a.plan&&a.plan.cls&&Object.values(a.plan.cls).some(o=>o.k===0.5));
+  return `<div class="card"><b>🗓️ Plan de la semana</b><div class="sub">Clases que toca pistolear cada día (${fmt(LS.get('planCap',1600))} productos por día como máximo)${has05?' · Semana '+(wp?'B':'A')+' en curso':''}</div>
+   <table class="t" style="margin-top:8px;font-size:13px">${[1,2,3,4,5,6].map(d=>{const C=cell(d,wp);return `<tr style="${d===wd?'background:#eff6ff;font-weight:600':''}"><td style="vertical-align:top;width:44px"><b>${DIAS[d]}</b>${d===wd?'<div style="font-size:10px;color:#2563eb">HOY</div>':''}</td><td>${[...C.m].map(([n,k])=>esc(n.replace(/^Pasillo\s*/,'P').replace(/ - .*/,''))+' <span class="sub">('+k+' cl)</span>').join(', ')||'<span class="sub">—</span>'}</td><td style="text-align:right;white-space:nowrap;vertical-align:top">${fmt(C.n)}</td></tr>`;}).join('')}
+   <tr><td><b>Dom</b></td><td class="sub" colspan="2">Libre / repaso de lo que esté en rojo</td></tr></table>
+   ${isAdmin()?`<div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap"><span class="sub">Recalcular para</span>${[800,1600,2400].map(v=>`<button class="btn sm ${LS.get('planCap',1600)===v?'pri':''}" data-gencap="${v}">${fmt(v)}/día</button>`).join('')}</div>`:''}</div>`;}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-gencap]');if(!b)return;if(!confirm('¿Recalcular el plan semanal para '+b.dataset.gencap+' productos por día? Reemplaza los días actuales.'))return;genPlan(+b.dataset.gencap);toast('Plan recalculado','ok');go(VIEW);});
+function planSheet(aid){const a=S.aisles().find(x=>x.id===aid);if(!a)return;const cls=srt(a.cats).filter(c=>CLS_CNT.get(c));
+  sheet(`<h2>📅 Días de revisión</h2><div class="sub">${esc(a.name)} · por clase</div><table class="t" style="margin-top:8px;font-size:13px">${cls.map(c=>{const o=clsPlan(a,c);return `<tr><td>${esc(short(c))}<div class="sub" style="font-size:11px">${CLS_CNT.get(c)} prod. · ${(KLIM[o.k]||KLIM[1]).t}</div></td><td style="text-align:right;white-space:nowrap">${o.d.map(d=>DIAS[d]).join(' y ')}${o.w!=null?' (sem. '+(o.w?'B':'A')+')':''}</td></tr>`;}).join('')}</table>
+  <div class="sub" style="margin-top:8px">Para cambiar el reparto, recalcula el plan en Inicio según cuántos productos pueden pistolear al día.</div>`);}
 
 /* ================= AVANCE ================= */
 let AVD=1;const AVO=new Set();
@@ -761,16 +786,18 @@ function avRows(days){const L=latestByClass(days);const out=[];
   for(const a of S.aisles()){if(a.active===false)continue;for(const c of a.cats){const n=CLS_CNT.get(c)||0;if(!n)continue;const r=L.get(a.id+'|'+c);let pres=0,falt=0,rp=0;
     if(r){for(const f of r.falt)if(f.c===c&&f.oh>0){if(isRep(r,f.s))rp++;else falt++;}for(const s in r.scans){const x=PR[BYSKU.get(s)];if(x&&x.cla===c)pres++;}}
     out.push({a,c,div:CLS_DIV.get(c)||'Sin división',n,r,pres,falt,rp});}}return out;}
-function semRows(){const L=latestByClass(0);const out=[];for(const a of S.aisles()){if(a.active===false)continue;for(const c of a.cats){if(!CLS_CNT.get(c))continue;const r=L.get(a.id+'|'+c);out.push({a,c,div:CLS_DIV.get(c)||'Sin división',r,s:sem(a,r)});}}return out;}
+function semRows(){const L=latestByClass(0);const out=[];for(const a of S.aisles()){if(a.active===false)continue;for(const c of a.cats){if(!CLS_CNT.get(c))continue;const r=L.get(a.id+'|'+c);out.push({a,c,div:CLS_DIV.get(c)||'Sin división',r,s:sem(a,r,c)});}}return out;}
 function semCnt(L){const o={g:0,y:0,r:0};for(const x of L)o[x.s]++;return o;}
 function semBar(o){const n=o.g+o.y+o.r||1;return `<div style="display:flex;height:10px;border-radius:9px;overflow:hidden;margin:6px 0 4px"><i style="width:${o.g/n*100}%;background:${SEMC.g}"></i><i style="width:${o.y/n*100}%;background:${SEMC.y}"></i><i style="width:${o.r/n*100}%;background:${SEMC.r}"></i></div>`;}
 function semTxt(o){return `<span style="color:${SEMC.g};font-weight:700">● ${o.g} al día</span> · <span style="color:${SEMC.y};font-weight:700">▲ ${o.y} por vencer</span> · <span style="color:${SEMC.r};font-weight:700">■ ${o.r} vencidas</span>`;}
-function todayCard(home){const wd=new Date().getDay();const A=S.aisles().filter(a=>a.active!==false&&planA(a).days.includes(wd));const SR=semRows();
-  const urg=home?[]:[...new Map(SR.filter(x=>x.s==='r'&&x.r&&!planA(x.a).days.includes(wd)).map(x=>[x.a.id,x.a])).values()];
-  const row=a=>{const L=SR.filter(x=>x.a.id===a.id);const done=L.filter(x=>x.r&&ageDays(x.r.end)===0).length;const ok=done===L.length&&L.length;
-    return `<div class="act" data-goa="${a.id}"><div class="ic ${ok?'g':done?'y':'r'}" style="font-size:${ok?18:12}px;font-weight:800">${ok?'✓':done+'/'+L.length}</div><div class="grow"><div class="t">${esc(a.name)}</div><div class="s">${done} de ${L.length} clase(s) hechas hoy · ${(FREQ[planA(a).f]||FREQ.s1).t.toLowerCase()}</div></div><div class="ch">›</div></div>`;};
-  return `<div class="card" style="border:1px solid #bfdbfe"><b>📅 Hoy ${DIASL[wd]} toca</b>${A.length?A.map(row).join(''):'<div class="sub" style="margin-top:6px">Hoy no hay pasillos programados. Aprovecha para revisar lo que está en rojo.</div>'}
-   ${urg.length?`<div class="sub" style="margin-top:8px;color:${SEMC.r};font-weight:600">Además, vencidos de otros días (ya revisados antes, pasaron su límite):</div>${urg.map(row).join('')}`:''}</div>`;}
+function todayCard(home){const now=Date.now(),wd=new Date().getDay();const SR=semRows();const T=SR.filter(x=>todayHas(x.a,x.c,now));
+  const byA=new Map();for(const x of T){if(!byA.has(x.a.id))byA.set(x.a.id,[]);byA.get(x.a.id).push(x);}
+  const urgL=home?[]:SR.filter(x=>x.s==='r'&&x.r&&!todayHas(x.a,x.c,now));const byU=new Map();for(const x of urgL){if(!byU.has(x.a.id))byU.set(x.a.id,[]);byU.get(x.a.id).push(x);}
+  const row=(L,urg)=>{const a=L[0].a;const done=L.filter(x=>x.r&&ageDays(x.r.end)===0).length;const ok=done===L.length;const n=L.reduce((s,x)=>s+(CLS_CNT.get(x.c)||0),0);
+    return `<div class="act" data-goa="${a.id}"><div class="ic ${ok?'g':done?'y':'r'}" style="font-size:${ok?18:12}px;font-weight:800">${ok?'✓':done+'/'+L.length}</div><div class="grow"><div class="t">${esc(a.name)}</div><div class="s">${L.map(x=>`<span style="${x.r&&ageDays(x.r.end)===0?'color:var(--g);text-decoration:line-through':''}">${esc(short(x.c))}</span>`).join(', ')}</div><div class="s" style="font-size:11px">${fmt(n)} productos${urg?' · vencidas':''}</div></div><div class="ch">›</div></div>`;};
+  const tot=T.reduce((s,x)=>s+(CLS_CNT.get(x.c)||0),0),dn=T.filter(x=>x.r&&ageDays(x.r.end)===0).length;
+  return `<div class="card" style="border:1px solid #bfdbfe"><div class="row"><b class="grow">📅 Hoy ${DIASL[wd]} toca</b><span class="badge ${dn===T.length&&T.length?'':'b'}">${dn}/${T.length} clases · ${fmt(tot)} prod.</span></div>${T.length?[...byA.values()].map(L=>row(L)).join(''):'<div class="sub" style="margin-top:6px">Hoy no hay clases programadas. Aprovecha para revisar lo que está en rojo.</div>'}
+   ${byU.size?`<div class="sub" style="margin-top:8px;color:${SEMC.r};font-weight:600">Además, vencidas de otros días (pasaron su límite):</div>${[...byU.values()].map(L=>row(L,1)).join('')}`:''}</div>`;}
 function avAgg(L){const o={cls:L.length,done:0,pres:0,falt:0,rp:0};for(const x of L){if(x.r)o.done++;o.pres+=x.pres;o.falt+=x.falt;o.rp+=x.rp;}
   o.av=o.cls?o.done/o.cls*100:0;const b=o.pres+o.rp+o.falt;o.cu=b?(o.pres+o.rp)/b*100:null;return o;}
 function avHead(name,o,big){const col=o.cu==null?'var(--mut)':o.cu>=95?'var(--g)':o.cu>=85?'var(--ora)':'var(--red)';
@@ -787,7 +814,7 @@ function vAv(){const R=avRows(AVD),T=avAgg(R);const SR=semRows(),SM=new Map(SR.m
   <div class="card"><b>🚦 Riesgo ante auditoría</b><div class="sub">Días desde la última revisión de cada clase, según la frecuencia de su pasillo.</div>${semBar(semCnt(SR))}<div style="font-size:13px">${semTxt(semCnt(SR))}</div></div>
   <div class="card">${avHead('Tienda '+HOME_LOCAL,T,1)}</div>
   ${[...g].sort((a,b)=>a[0].localeCompare(b[0])).map(([dv,L])=>{const pa=new Map();for(const x of L){if(!pa.has(x.a.id))pa.set(x.a.id,[]);pa.get(x.a.id).push(x);}
-    return det('d|'+dv,[...pa].map(([aid,LA])=>det('p|'+dv+'|'+aid,LA.sort((a,b)=>a.c.localeCompare(b.c)).map(x=>`<div class="row" ${x.r?`data-avr="${x.r.id}"`:''} style="padding:7px 0 7px 20px;border-top:1px dashed #eef0f2;font-size:13px;${x.r?'cursor:pointer':''}"><div class="grow" style="min-width:0"><div>${esc(short(x.c))}</div><div class="sub" style="font-size:11px">${x.r?fdt(x.r.end)+' · '+esc(x.r.userName)+' · '+x.pres+' presentes':'sin revisar en '+(AVD===1?'el día':'7 días')+' · '+x.n+' producto(s)'}</div></div><div style="text-align:right;flex:none">${(()=>{const s=SM.get(x.a.id+'|'+x.c);return semBadge(x.a,s&&s.r);})()}<div style="margin-top:3px">${!x.r?'':x.falt?`<span style="font-weight:800;color:var(--red)">${x.falt} faltan</span>`:'<span style="font-weight:700;color:var(--g)">✓ completo</span>'}</div></div></div>`).join(''),avHead(LA[0].a.name,avAgg(LA))+semBar(sc(LA)),1)).join(''),avHead(dv,avAgg(L),1)+semBar(sc(L))+`<div style="font-size:11px">${semTxt(sc(L))}</div>`,0);}).join('')||'<div class="card empty">No hay pasillos activos.</div>'}`;
+    return det('d|'+dv,[...pa].map(([aid,LA])=>det('p|'+dv+'|'+aid,LA.sort((a,b)=>a.c.localeCompare(b.c)).map(x=>`<div class="row" ${x.r?`data-avr="${x.r.id}"`:''} style="padding:7px 0 7px 20px;border-top:1px dashed #eef0f2;font-size:13px;${x.r?'cursor:pointer':''}"><div class="grow" style="min-width:0"><div>${esc(short(x.c))}</div><div class="sub" style="font-size:11px">${x.r?fdt(x.r.end)+' · '+esc(x.r.userName)+' · '+x.pres+' presentes':'sin revisar en '+(AVD===1?'el día':'7 días')+' · '+x.n+' producto(s)'}</div></div><div style="text-align:right;flex:none">${(()=>{const s=SM.get(x.a.id+'|'+x.c);return semBadge(x.a,s&&s.r,x.c);})()}<div style="margin-top:3px">${!x.r?'':x.falt?`<span style="font-weight:800;color:var(--red)">${x.falt} faltan</span>`:'<span style="font-weight:700;color:var(--g)">✓ completo</span>'}</div></div></div>`).join(''),avHead(LA[0].a.name,avAgg(LA))+semBar(sc(LA)),1)).join(''),avHead(dv,avAgg(L),1)+semBar(sc(L))+`<div style="font-size:11px">${semTxt(sc(L))}</div>`,0);}).join('')||'<div class="card empty">No hay pasillos activos.</div>'}`;
   $$('[data-avd]').forEach(b=>b.onclick=()=>{AVD=+b.dataset.avd;vAv();});
   $$('[data-avk]').forEach(d=>d.addEventListener('toggle',()=>{const k=d.dataset.avk;if(d.open)AVO.add(k);else AVO.delete(k);}));
   $$('[data-avr]').forEach(e=>e.onclick=()=>recDetail(e.dataset.avr));}
