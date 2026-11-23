@@ -292,6 +292,22 @@ async function loadEmbedded(){const b64=$('#dbdata').textContent.trim();if(!b64|
   const bin=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));return await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).json();}
 const normG=g=>String(g||'').replace(/\D/g,'').replace(/^0+/,'');
 function parseDate(s){const m=String(s||'').match(/(\d{1,2})-(\d{1,2})-(\d{4})/);return m?new Date(+m[3],+m[2]-1,+m[1]):null;}
+// junta la carga nueva con la anterior: las divisiones que vienen en los archivos nuevos se reemplazan, las demás se mantienen
+function mergeDB(o,nw){const nd=new Set(nw.products.map(p=>nw.dict[p[P.div]]));const upd=[...nd].map(divCode).sort();
+  const fNew=nw.meta.fechaImpresion||'';const oldF=(o&&o.meta&&o.meta.fechaImpresion)||'';
+  const df=Object.assign({},(o&&o.meta&&o.meta.divFecha)||{});if(o&&o.products&&!(o.meta&&o.meta.divFecha))for(const p of o.products)df[divCode(o.dict[p[P.div]])]=oldF;
+  for(const d of upd)df[d]=fNew;
+  const kept=[];
+  if(o&&o.products&&o.products.length){const dm=new Map(nw.dict.map((s,i)=>[s,i])),sm=new Map(nw.stores.map((s,i)=>[s,i]));
+    const D=s=>{let i=dm.get(s);if(i===undefined){i=nw.dict.length;nw.dict.push(s);dm.set(s,i);}return i;};const S=s=>{let i=sm.get(s);if(i===undefined){i=nw.stores.length;nw.stores.push(s);sm.set(s,i);}return i;};
+    const sk=new Set(nw.products.map(p=>String(p[P.sku])));const ks=new Set();
+    for(const p of o.products){const dv=o.dict[p[P.div]];if(nd.has(dv)||sk.has(String(p[P.sku])))continue;ks.add(divCode(dv));
+      const q=p.slice();for(let i=3;i<=13;i++)q[i]=D(o.dict[p[i]]);for(let i=20;i<=22;i++)q[i]=D(o.dict[p[i]]);
+      const r=p[P.rows].slice();for(let k=0;k<r.length;k+=RW){r[k]=S(o.stores[r[k]]);for(let j=10;j<=14;j++)r[k+j]=D(o.dict[r[k+j]]);}q[P.rows]=r;nw.products.push(q);}
+    kept.push(...[...ks].sort());
+    for(const x of (o.meta.divisiones||[]))if(!nw.meta.divisiones.includes(x)&&kept.includes(divCode(x)))nw.meta.divisiones.push(x);}
+  for(const k of Object.keys(df))if(!upd.includes(k)&&!kept.includes(k))delete df[k];
+  nw.meta.divFecha=df;nw.meta._merge={upd,kept};return nw;}
 function setDB(db){
   DB=db;IDX=new Map();PR=[];BYSKU=new Map();
   ST_HOME=DB.stores.indexOf(HOME_LOCAL);
@@ -369,7 +385,11 @@ const scopeTxt=r=>r.grp==='sub'?'el subdepartamento':r.grp==='plan'?'las clases'
 function sortFalt(L){const tot={};for(const f of L)tot[f.c]=(tot[f.c]||0)+(f.v||0);return [...L].sort((a,b)=>(tot[b.c]-tot[a.c])||a.c.localeCompare(b.c)||(b.v||0)-(a.v||0));}
 function profInfo(){const m=((DB&&DB.meta&&DB.meta.fechaImpresion)||'').match(/(\d{1,2})-(\d{1,2})-0?(\d{2,4})/);if(!m)return null;let y=+m[3];if(y<100)y+=2000;const d=new Date(y,m[2]-1,+m[1]);const t=new Date();t.setHours(0,0,0,0);
   return {age:Math.round((t-d)/864e5),txt:String(m[1]).padStart(2,'0')+'/'+String(m[2]).padStart(2,'0')};}
-function profBanner(){const p=profInfo();if(!p)return '';if(p.age<1)return `<div class="sub" style="margin:2px 2px 8px;color:var(--g)">📦 PROF del ${p.txt} (hoy) ✓</div>`;
+function profOld(){const df=DB&&DB.meta&&DB.meta.divFecha;if(!df)return [];const v=Object.values(df);const top=v.sort((a,b)=>pdF(b)-pdF(a))[0];return Object.keys(df).filter(k=>pdF(df[k])<pdF(top)).sort();}
+function pdF(s){const m=String(s||'').match(/(\d{1,2})-(\d{1,2})-0?(\d{2,4})/);if(!m)return 0;let y=+m[3];if(y<100)y+=2000;return new Date(y,m[2]-1,+m[1]).getTime();}
+function profBanner(){const p=profInfo();if(!p)return '';const OLD=profOld();
+  if(p.age<1&&OLD.length)return `<div class="card" style="background:#fef3c7;border:1px solid #fcd34d;color:#92400e"><b>⚠️ PROF de hoy cargada solo en parte</b><div style="font-size:13px;margin-top:4px">Siguen con la PROF anterior: <b>${OLD.join(', ')}</b>.${isAdmin()?' Carga esos archivos para tener todo al día.':''}</div>${isAdmin()?'<button class="btn pri sm" data-profimp="1" style="margin-top:10px">⇡ Cargar las que faltan</button>':''}</div>`;
+  if(p.age<1)return `<div class="sub" style="margin:2px 2px 8px;color:var(--g)">📦 PROF del ${p.txt} (hoy) ✓</div>`;
   return `<div class="card" style="background:#fee2e2;border:1px solid #fca5a5;color:#991b1b"><b>⚠️ La PROF es del ${p.txt}${p.age>1?' (hace '+p.age+' días)':' (de ayer)'}</b><div style="font-size:13px;margin-top:4px">${isAdmin()?'Carga la de hoy para que el OH esté al día.':'El stock puede no estar al día. Avísale a tu administrador que cargue la PROF de hoy.'}</div>${isAdmin()?'<button class="btn pri sm" data-profimp="1" style="margin-top:10px">⇡ Cargar PROF de hoy</button>':''}</div>`;}
 document.addEventListener('click',e=>{if(!e.target.closest('[data-profimp]'))return;dataSheet();const b=$('#dImp');if(b)b.click();});
 function planOf(a,cls){const set=new Set(cls?[cls]:a.cats);return PR.filter(x=>x.act&&set.has(x.cla));}
@@ -601,15 +621,15 @@ function vMore(){const A=S.aisles().filter(a=>a.active!==false);const L=latestBy
   const on=(id,f)=>{const e=$('#'+id);if(e)e.onclick=f;};on('mAis',()=>go('ais'));on('aUsers',()=>go('users'));on('aBk',backupSheet);on('aSy',syncSheet);}
 function csvPending(pend){csvDownload('reposicion_pendiente.csv',[['Pasillo','Clase','SKU','GTIN','Descripcion','OH','Recorrida','Usuario'],...pend.map(p=>{const x=PR[BYSKU.get(p.f.s)]||{};return [p.a.name,short(p.c),p.f.s,x.gtin||'',p.f.d,p.f.oh,fdt(p.r.end),p.r.userName];})]);}
 function dataSheet(){const fi=(DB.meta.fechaImpresion||'');
-  const sh=sheet(`<h2>Datos de stock</h2><div class="card sub"><b>${esc(DB.meta.empresa)}</b> — ${esc(DB.meta.reporte)}<br>${esc(DB.meta.rango)} (${DAYS} días)<br>Impreso: ${esc(fi)}<br>Archivos: ${esc((DB.meta.archivos||[]).join(', '))}<br>${fmt(PR.length)} productos en ${esc(HOME_LOCAL)}</div>
-  ${isAdmin()?`<div class="card"><b>Actualizar stock</b><div class="sub">Elige TODOS los archivos GSTPROFUND_TDAS del día a la vez (J01, J02 y los demás, .txt o .txt.gz): la carga reemplaza el stock anterior. Con la sincronización activa, el stock nuevo pasa solo a todos los celulares.</div><button class="btn pri" id="dImp" style="margin-top:10px">Cargar reportes</button><div class="sub" id="dMsg" style="margin-top:8px"></div><button class="btn sm" id="dReset" style="margin-top:6px">Volver a los datos incluidos</button></div>`:''}`);
+  const sh=sheet(`<h2>Datos de stock</h2><div class="card sub"><b>${esc(DB.meta.empresa)}</b> — ${esc(DB.meta.reporte)}<br>${esc(DB.meta.rango)} (${DAYS} días)<br>Impreso: ${esc(fi)}<br>Archivos: ${esc((DB.meta.archivos||[]).join(', '))}${DB.meta.divFecha?'<br>Por división: '+Object.entries(DB.meta.divFecha).sort().map(([k,v])=>esc(k)+' '+esc(String(v).split(' ')[0])).join(' · '):''}<br>${fmt(PR.length)} productos en ${esc(HOME_LOCAL)}</div>
+  ${isAdmin()?`<div class="card"><b>Actualizar stock</b><div class="sub">Elige los archivos GSTPROFUND_TDAS del día (.txt o .txt.gz). Puedes cargar todos juntos o por partes: solo se reemplazan las divisiones que cargas (por ejemplo J01) y las demás se mantienen. Con la sincronización activa, el stock nuevo pasa solo a todos los celulares.</div><button class="btn pri" id="dImp" style="margin-top:10px">Cargar reportes</button><div class="sub" id="dMsg" style="margin-top:8px"></div><button class="btn sm" id="dReset" style="margin-top:6px">Volver a los datos incluidos</button></div>`:''}`);
   const i=sh.querySelector('#dImp');if(i){i.onclick=()=>$('#fileRep').click();sh.querySelector('#dReset').onclick=async()=>{await idbDel('db');setDB(await loadEmbedded());toast('Datos incluidos restaurados','ok');sh.remove();go(VIEW);};}}
 $('#fileRep').onchange=async e=>{const files=[...e.target.files];e.target.value='';if(!files.length)return;const msg=t=>{const m=$('#dMsg');if(m)m.textContent=t;};const Pz=createParser(keepLocal,HOME_LOCAL);
   try{for(const f of files){Pz.meta.archivos.push(f.name.replace(/\.gz$/,''));msg('Procesando '+f.name+'…');let s=f.stream();
     const h=new Uint8Array(await f.slice(0,2).arrayBuffer());if(h[0]===0x1f&&h[1]===0x8b)s=s.pipeThrough(new DecompressionStream('gzip'));
     const rd=s.pipeThrough(new TextDecoderStream('windows-1252')).getReader();let buf='';
     for(;;){const{value,done}=await rd.read();if(done)break;buf+=value;let i;while((i=buf.indexOf('\n'))>=0){Pz.line(buf.slice(0,i));buf=buf.slice(i+1);}}if(buf)Pz.line(buf);}
-    const db=Pz.result();if(!db.products.length)throw new Error('No se encontraron filas de '+HOME_LOCAL);await idbSet('db',db);setDB(db);msg('Listo: '+fmt(PR.length)+' productos. '+db.meta.rango);toast('Stock actualizado','ok');if(syncUrl()){LS.set('stockPend',Date.now());msg('Listo: '+fmt(PR.length)+' productos. Enviando a los demás celulares…');try{await pushStock();msg('Listo: '+fmt(PR.length)+' productos. Ya se envió a todos los celulares.');}catch(e2){msg('Listo en este celular. Se enviará a los demás apenas haya conexión.');}syncBadge();}
+    const db0=Pz.result();if(!db0.products.length)throw new Error('No se encontraron filas de '+HOME_LOCAL);const db=mergeDB(DB,db0);await idbSet('db',db);setDB(db);const MR=db.meta._merge;msg('Listo: '+fmt(PR.length)+' productos. Actualizadas: '+MR.upd.join(', ')+'.'+(MR.kept.length?' Se mantienen de la carga anterior: '+MR.kept.join(', ')+'.':''));toast('Stock actualizado','ok');if(syncUrl()){LS.set('stockPend',Date.now());msg('Listo: '+fmt(PR.length)+' productos. Enviando a los demás celulares…');try{await pushStock();msg('Listo: '+fmt(PR.length)+' productos. Ya se envió a todos los celulares.');}catch(e2){msg('Listo en este celular. Se enviará a los demás apenas haya conexión.');}syncBadge();}
   }catch(err){msg('Error: '+err.message);toast('Error al cargar','err');}};
 function backupSheet(){const sh=sheet(`<h2>Compartir datos entre celulares</h2><div class="sub">Como la app funciona sin internet, cada celular guarda sus datos. Para pasar los pasillos y usuarios a otro celular, o juntar las recorridas de todos en el celular del jefe, exporta un archivo y ábrelo en el otro celular con "Importar".</div>
   <div class="card">${act('⬆️','g','Exportar todo','Pasillos, usuarios y recorridas (archivo .json)','bEx')}${act('⬇️','b','Importar archivo','Junta las recorridas y actualiza pasillos y usuarios','bIm')}</div>`);
