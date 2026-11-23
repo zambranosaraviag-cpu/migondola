@@ -635,6 +635,7 @@ function vMore(){const A=S.aisles().filter(a=>a.active!==false);const L=latestBy
    <div><div class="kpi" style="padding:4px"><div class="v" style="color:var(--g)">${rev}</div><div class="l">Pasillos revisados (7 días)</div></div></div>
    <div><div class="kpi" style="padding:4px"><div class="v" style="color:#e11d48">${pend.length}</div><div class="l">Faltan por exhibir</div></div></div></div>
   <div class="card">${act('🧮','g','Sanear stock','Pistolea, mira el stock del sistema y anota el conteo físico','mSan')}${act('📦','o','Productos','Buscar un producto, su stock y en qué pasillo va','mProd')}
+   ${isAdmin()?'':act('📅','v','Mi calendario de tareas','Qué te toca pistolear cada día de la semana','mWeek')}
    ${act('🕘','b','Historial de recorridas',isAdmin()?'Todas las recorridas':'Tus recorridas','mHist')}
    ${act('🗓️','y','Datos de stock','Reporte del '+esc(((DB.meta.rango||'').match(/al (\S+)/)||[])[1]||'')+(isAdmin()?' · cargar reporte nuevo':''),'aData')}</div>
   ${isAdmin()?`<div class="sec">Administración</div><div class="card">${act('🗓️','v','Plan de la semana','Qué toca cada día por equipo','mWeek')}
@@ -643,7 +644,7 @@ function vMore(){const A=S.aisles().filter(a=>a.active!==false);const L=latestBy
    ${act('👥','b','Usuarios','Altas, roles, contraseñas y pasillos asignados','aUsers')}
    ${act('☁️','g','Sincronización',syncUrl()?(SYNC_ERR?'Sin conexión con la hoja':'Activada con Google Sheets'):'Desactivada · conectar con Google Sheets','aSy')}
    ${act('🔄','v','Compartir datos por archivo','Exportar o importar pasillos, usuarios y recorridas','aBk')}</div>`:''}`;
-  $('#mProd').onclick=()=>go('prod');$('#mSan').onclick=()=>go('san');$('#mXs').onclick=xsSheet;$('#mHist').onclick=()=>go('hist');$('#mWeek').onclick=()=>{const sh=sheet(weekTable());sh.querySelectorAll('.card').forEach(c=>c.style.boxShadow='none');};$('#aData').onclick=dataSheet;
+  $('#mProd').onclick=()=>go('prod');$('#mSan').onclick=()=>go('san');if($('#mXs'))$('#mXs').onclick=xsSheet;$('#mHist').onclick=()=>go('hist');if($('#mWeek'))$('#mWeek').onclick=()=>{const sh=sheet(weekTable());sh.querySelectorAll('.card').forEach(c=>c.style.boxShadow='none');};$('#aData').onclick=dataSheet;
   const on=(id,f)=>{const e=$('#'+id);if(e)e.onclick=f;};on('mAis',()=>go('ais'));on('aUsers',()=>go('users'));on('aBk',backupSheet);on('aSy',syncSheet);}
 function csvPending(pend){csvDownload('reposicion_pendiente.csv',[['Pasillo','Clase','SKU','GTIN','Descripcion','OH','Recorrida','Usuario'],...pend.map(p=>{const x=PR[BYSKU.get(p.f.s)]||{};return [p.a.name,short(p.c),p.f.s,x.gtin||'',p.f.d,p.f.oh,fdt(p.r.end),p.r.userName];})]);}
 function dataSheet(){const fi=(DB.meta.fechaImpresion||'');
@@ -928,10 +929,10 @@ function ageDays(ts){return Math.round((dayN(Date.now())-dayN(ts))/864e5);}
 function sem(a,r,c){const pa=a.plan&&a.plan.at;if(!r&&!pa)return 'r';const pl=KLIM[clsPlan(a,c).k]||KLIM[1],ag=ageDays(r?r.end:pa);return ag<=pl.g?'g':ag<=pl.lim?'y':'r';}
 const SEMC={g:'#16a34a',y:'#d97706',r:'#dc2626'};
 function semBadge(a,r,c){const s=sem(a,r,c);const txt=r?(ageDays(r.end)===0?'hoy':'hace '+ageDays(r.end)+' d'):(s==='r'?'nunca':'pendiente');return `<span style="display:inline-block;min-width:64px;text-align:center;font-size:12px;font-weight:700;color:#fff;background:${SEMC[s]};border-radius:99px;padding:2px 8px">${s==='g'?'●':s==='y'?'▲':'■'} ${txt}</span>`;}
-function weekTable(){const A=S.aisles().filter(a=>a.active!==false).sort((x,y)=>aNum(x)-aNum(y));const wd=new Date().getDay();
+function weekTable(){const MA=myAisles();const A=S.aisles().filter(a=>a.active!==false&&(!MA||MA.has(a.id))).sort((x,y)=>aNum(x)-aNum(y));const wd=new Date().getDay();
   const cell=(d,tm)=>{const m=new Map();let n=0;for(const a of A)for(const c of a.cats){const k=CLS_CNT.get(c)||0;if(!k)continue;const o=clsPlan(a,c);if((o.t||teamOf(c))!==tm||!o.d.includes(d))continue;n+=k;m.set(a.name,(m.get(a.name)||0)+1);}return {n,m};};
   const lbl=n=>esc(n.replace(/^Pasillo\s*/,'P').replace(/ - .*/,'').replace(/Cajas.*/,'Cajas'));
-  return `<div class="card"><b>🗓️ Plan de la semana por equipo</b><div class="sub">Cada día cada equipo hace al menos una clase de cada uno de sus pasillos. Toda la tienda queda pistoleada cada semana, de lunes a domingo; de lunes a viernes parejo (lunes el más liviano) y sábado y domingo con menos carga; las clases gigantes (200+ SKU) se reparten entre miércoles, jueves y viernes. Perecibles 3 veces por semana, día por medio, por subdepartamento completo. Librería no entra por ahora.</div>
+  return `<div class="card">${MA?'<b>📅 Tu calendario de tareas</b><div class="sub">Lo que te toca pistolear cada día en tus pasillos. Toca Escanear y elige tu pasillo.</div>':`<b>🗓️ Plan de la semana por equipo</b><div class="sub">Cada día cada equipo hace al menos una clase de cada uno de sus pasillos. Toda la tienda queda pistoleada cada semana, de lunes a domingo; de lunes a viernes parejo (lunes el más liviano) y sábado y domingo con menos carga; las clases gigantes (200+ SKU) se reparten entre miércoles, jueves y viernes. Perecibles 3 veces por semana, día por medio, por subdepartamento completo. Librería no entra por ahora.</div>`}
    ${DAYS7.map(d=>`<div style="margin-top:8px;padding:8px 10px;border-radius:12px;${d===wd?'background:#eff6ff;border:1px solid #bfdbfe':'background:#f8faf8'}"><b>${DIASL[d][0].toUpperCase()+DIASL[d].slice(1)}</b>${d===wd?' <span style="font-size:11px;color:#2563eb;font-weight:700">HOY</span>':''}
      ${TEAMS.map(([tm,tn])=>{const C=cell(d,tm);return C.n?`<div class="row" style="font-size:13px;margin-top:3px;align-items:flex-start"><div style="width:140px;flex:none">${tn}</div><div class="grow">${[...C.m].map(([n,k])=>lbl(n)+' <span class="sub">('+k+' cl)</span>').join(', ')}</div><div style="flex:none;margin-left:6px" class="sub">${fmt(C.n)}</div></div>`:'';}).join('')}</div>`).join('')}
    ${isAdmin()?'<button class="btn sm" data-gencap="1" style="margin-top:8px">↻ Recalcular plan</button>':''}</div>`;}
@@ -1155,10 +1156,10 @@ const RCH2=[['cob','Cobertura stock'],['sinrot','Sin rotación'],['neg','OH nega
 const RGRP=[['pis','📷 Pistoleo',RCH1,'Recorridas, faltantes y reposición'],['stk','📦 Stock',RCH2.slice(0,6),'Stock y ventas del reporte GSTPROFUND'],['cat','🏷️ Catálogo',RCH2.slice(6),'Proveedores y tendencia de clases (semanas del reporte)']];
 function vRep(k){if(k)RP=k;const A=S.aisles();if(!RA&&A.length)RA=A[0].id;
   const chips=L=>`<div class="chips">${L.map(([k,l])=>`<button class="chip ${RP===k?'on':''}" data-rp="${k}">${l}</button>`).join('')}</div>`;
-  const G=RGRP.find(g=>g[2].some(([k])=>k===RP))||RGRP[0];
-  $('#main').innerHTML=`<h1>Reportes</h1><div class="seg" style="display:flex;gap:6px;margin:6px 0 4px">${RGRP.map(g=>`<button class="btn sm ${g===G?'pri':''}" data-rg="${g[0]}" style="flex:1">${g[1]}</button>`).join('')}</div>
+  const RG=isAdmin()?RGRP:[['pis',RGRP[0][1],RCH1.filter(([k])=>k==='pasillo'||k==='repo'),RGRP[0][3]],RGRP[1]];if(!RG.some(g=>g[2].some(([k])=>k===RP)))RP='pasillo';const G=RG.find(g=>g[2].some(([k])=>k===RP))||RG[0];
+  $('#main').innerHTML=`<h1>Reportes</h1><div class="seg" style="display:flex;gap:6px;margin:6px 0 4px">${RG.map(g=>`<button class="btn sm ${g===G?'pri':''}" data-rg="${g[0]}" style="flex:1">${g[1]}</button>`).join('')}</div>
    <div class="sub" style="margin:4px 2px">${G[3]}</div>${chips(G[2])}<div id="rBody"></div>`;
-  $$('[data-rg]').forEach(b=>b.onclick=()=>{const g=RGRP.find(x=>x[0]===b.dataset.rg);vRep(g[2][0][0]);});
+  $$('[data-rg]').forEach(b=>b.onclick=()=>{const g=RG.find(x=>x[0]===b.dataset.rg);vRep(g[2][0][0]);});
   $$('[data-rp]').forEach(b=>b.onclick=()=>vRep(b.dataset.rp));repBody();}
 const perSel=()=>`<label class="f">Recorridas de</label><select class="sel" id="rD">${[[1,'Hoy'],[7,'Últimos 7 días'],[30,'Últimos 30 días'],[0,'Todo']].map(([v,l])=>`<option value="${v}" ${RD===v?'selected':''}>${l}</option>`).join('')}</select>`;
 const aisSel=(all)=>`<label class="f">Pasillo</label><select class="sel" id="${all?'rA2':'rA'}">${all?'<option value="">Todos</option>':''}${S.aisles().map(a=>`<option value="${a.id}" ${(all?RA2:RA)===a.id?'selected':''}>${esc(a.name)}</option>`).join('')}</select>`;
