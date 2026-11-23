@@ -628,23 +628,23 @@ function vHome(){const A=S.aisles().filter(a=>a.active!==false);const L=latestBy
   $$('[data-pa]').forEach(e=>e.onclick=()=>go('rep','repo'));
   $('#aAdj').onclick=adjSheet;$('#hSan').onclick=()=>go('san');}
 function vMore(){const A=S.aisles().filter(a=>a.active!==false);const L=latestByClass(7);const rev=new Set([...L.values()].map(r=>r.aisleId)).size;const pend=pending(7);
-  $('#main').innerHTML=`<h1>Más</h1>
-  <div class="sec">Resumen</div>
+  const AD=isAdmin();$('#main').innerHTML=`<h1>Más</h1>
+  ${AD?`<div class="sec">Resumen</div>
   <div class="card kp"><div><div class="kpi" style="padding:4px"><div class="v">${fmt(PR.filter(x=>x.act).length)}</div><div class="l">Productos activos</div></div></div>
    <div><div class="kpi" style="padding:4px"><div class="v">${A.length}</div><div class="l">Pasillos activos</div></div></div>
    <div><div class="kpi" style="padding:4px"><div class="v" style="color:var(--g)">${rev}</div><div class="l">Pasillos revisados (7 días)</div></div></div>
-   <div><div class="kpi" style="padding:4px"><div class="v" style="color:#e11d48">${pend.length}</div><div class="l">Faltan por exhibir</div></div></div></div>
-  <div class="card">${act('🧮','g','Sanear stock','Pistolea, mira el stock del sistema y anota el conteo físico','mSan')}${act('📦','o','Productos','Buscar un producto, su stock y en qué pasillo va','mProd')}
+   <div><div class="kpi" style="padding:4px"><div class="v" style="color:#e11d48">${pend.length}</div><div class="l">Faltan por exhibir</div></div></div></div>`:''}
+  <div class="card">${AD?act('🧮','g','Sanear stock','Pistolea, mira el stock del sistema y anota el conteo físico','mSan'):''}${act('📦','o','Productos','Buscar un producto, su stock y en qué pasillo va','mProd')}
    ${isAdmin()?'':act('📅','v','Mi calendario de tareas','Qué te toca pistolear cada día de la semana','mWeek')}
    ${act('🕘','b','Historial de recorridas',isAdmin()?'Todas las recorridas':'Tus recorridas','mHist')}
-   ${act('🗓️','y','Datos de stock','Reporte del '+esc(((DB.meta.rango||'').match(/al (\S+)/)||[])[1]||'')+(isAdmin()?' · cargar reporte nuevo':''),'aData')}</div>
+   ${AD?act('🗓️','y','Datos de stock','Reporte del '+esc(((DB.meta.rango||'').match(/al (\S+)/)||[])[1]||'')+' · cargar reporte nuevo','aData'):''}</div>
   ${isAdmin()?`<div class="sec">Administración</div><div class="card">${act('🗓️','v','Plan de la semana','Qué toca cada día por equipo','mWeek')}
    ${act('🗑️','r','Quitados del surtido',XS.all().length+' código(s) fuera del surtido'+(isAdmin()?' · quitar desde la ficha del producto':''),'mXs')}
    ${act('🗂️','y','Pasillos','Clases de cada pasillo, plan por clase, activar o borrar','mAis')}
    ${act('👥','b','Usuarios','Altas, roles, contraseñas y pasillos asignados','aUsers')}
    ${act('☁️','g','Sincronización',syncUrl()?(SYNC_ERR?'Sin conexión con la hoja':'Activada con Google Sheets'):'Desactivada · conectar con Google Sheets','aSy')}
    ${act('🔄','v','Compartir datos por archivo','Exportar o importar pasillos, usuarios y recorridas','aBk')}</div>`:''}`;
-  $('#mProd').onclick=()=>go('prod');$('#mSan').onclick=()=>go('san');if($('#mXs'))$('#mXs').onclick=xsSheet;$('#mHist').onclick=()=>go('hist');if($('#mWeek'))$('#mWeek').onclick=()=>{const sh=sheet(weekTable());sh.querySelectorAll('.card').forEach(c=>c.style.boxShadow='none');};$('#aData').onclick=dataSheet;
+  $('#mProd').onclick=()=>go('prod');if($('#mSan'))$('#mSan').onclick=()=>go('san');if($('#mXs'))$('#mXs').onclick=xsSheet;$('#mHist').onclick=()=>go('hist');if($('#mWeek'))$('#mWeek').onclick=()=>{const sh=sheet(weekTable());sh.querySelectorAll('.card').forEach(c=>c.style.boxShadow='none');};if($('#aData'))$('#aData').onclick=dataSheet;
   const on=(id,f)=>{const e=$('#'+id);if(e)e.onclick=f;};on('mAis',()=>go('ais'));on('aUsers',()=>go('users'));on('aBk',backupSheet);on('aSy',syncSheet);}
 function csvPending(pend){csvDownload('reposicion_pendiente.csv',[['Pasillo','Clase','SKU','GTIN','Descripcion','OH','Recorrida','Usuario'],...pend.map(p=>{const x=PR[BYSKU.get(p.f.s)]||{};return [p.a.name,short(p.c),p.f.s,x.gtin||'',p.f.d,p.f.oh,fdt(p.r.end),p.r.userName];})]);}
 function dataSheet(){const fi=(DB.meta.fechaImpresion||'');
