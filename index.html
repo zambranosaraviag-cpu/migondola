@@ -297,10 +297,10 @@ async function syncNow(){const url=syncUrl();if(!url||SYNCING)return;SYNCING=tru
     if(Object.keys(LS.get('dirty',{})).length)setTimeout(syncNow,500);
   }catch(e){SYNC_ERR='Sin conexión con la hoja: '+e.message;}finally{SYNCING=false;syncBadge();}}
 function applyRemote(items){const st=items.filter(x=>x.k==='d'&&x.id==='stock').sort((a,b)=>b.upd-a.upd)[0];if(st)applyStock(st);const D=LS.get('dirty',{});let ch=false;APPLYING=true;
-  try{const GS={u:[S.users,S.setUsers],a:[S.aisles,S.setAisles],r:[S.recs,S.setRecs],l:[QS.lots,QS.setLots],q:[QS.revs,QS.setRevs],g:[()=>LS.get('qcfg',[]),x=>LS.set('qcfg',x)]};for(const k of['u','a','r','l','q','g']){const[get,set]=GS[k];const L=get();const m=new Map(L.map(x=>[x.id,x]));let c=false;
+  try{const GS={u:[S.users,S.setUsers],a:[S.aisles,S.setAisles],r:[S.recs,S.setRecs],l:[QS.lots,QS.setLots],q:[QS.revs,QS.setRevs],g:[()=>LS.get('qcfg',[]),x=>LS.set('qcfg',x)],j:[AJ.all,AJ.set]};for(const k of['u','a','r','l','q','g','j']){const[get,set]=GS[k];const L=get();const m=new Map(L.map(x=>[x.id,x]));let c=false;
       for(const it of items){if(it.k!==k||D[k+'|'+it.id])continue;const cur=m.get(it.id);
         if(it.del){if(cur&&(cur.upd||0)<=it.upd){m.delete(it.id);c=true;}}else if(!cur||(cur.upd||0)<it.upd){m.set(it.id,it.d);c=true;}}
-      if(c){let out=[...m.values()];if(k==='r'||k==='q')out.sort((a,b)=>b.start-a.start);if(k==='l')out.sort((a,b)=>b.created-a.created);set(out);ch=true;}}}finally{APPLYING=false;}
+      if(c){let out=[...m.values()];if(k==='r'||k==='q')out.sort((a,b)=>b.start-a.start);if(k==='l')out.sort((a,b)=>b.created-a.created);if(k==='j')out.sort((a,b)=>b.ts-a.ts);set(out);ch=true;}}}finally{APPLYING=false;}
   if(ch){if(ME){const u=S.users().find(x=>x.id===ME.id);if(u)ME=u;}if(REC){const r=S.recs().find(x=>x.id===REC.id);if(r&&!(VIEW==='scan'&&REC.open))REC=r;}
     if(ME&&!$('#fs').classList.contains('hide'))return;if(QREV&&QREV.open){const q=QS.revs().find(x=>x.id===QREV.id);if(q)QREV=q;}if(ME&&['home','hist','rep','qhome','qalert','qhist'].includes(VIEW)&&!document.querySelector('.sheet'))go(VIEW);if(!ME)showLogin();}}
 if('serviceWorker' in navigator&&isSecureContext&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});setInterval(syncNow,25000);window.addEventListener('online',syncNow);document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncNow();});
@@ -477,6 +477,28 @@ function vQHist(){const R=QS.revs().filter(r=>isAdmin()||r.userId===ME.id).slice
     const sh=sheet(`<h2>${esc(r.aisleName)}</h2><div class="sub">${esc(r.userName)} · ${fdt(r.start)}${r.end?' a '+fdt(r.end):''}</div><div class="sec">Fechas cortas cargadas (${ls.length})</div>${ls.map(l=>lotRow(l,false)).join('')||'<div class="empty">Ninguna</div>'}
      ${r.open&&r.userId===ME.id?'<button class="btn pri big" id="hq">📷 Seguir revisando</button>':''}`);const b=sh.querySelector('#hq');if(b)b.onclick=()=>{sh.remove();QREV=r;qScanUI();};});}
 function codeIn(c){if(MODE==='cal'&&QREV&&VIEW==='qscan')qCode(c);else scanCode(c);}
+/* ================= AJUSTES DE STOCK (conteo físico) ================= */
+const AJ={all:()=>LS.get('adjs',[]),set:l=>{l=l.slice(0,3000);track('j',AJ.all(),l);LS.set('adjs',l);}};
+function adjBlock(x){const p=AJ.all().find(a=>a.sku===x.sku&&!a.done);
+  return `<div class="card" style="border:1px solid #bfdbfe"><b>📝 Stock físico</b><div class="sub">¿Contaste otra cantidad en tienda? Anótala para ajustarla luego en el sistema.</div>
+  ${p?`<div class="sub" style="margin-top:6px;color:var(--blu)">Pendiente de ajuste: físico <b>${fmt(p.fis)}</b> vs sistema ${fmt(p.oh)} (dif. ${p.fis-p.oh>0?'+':''}${fmt(p.fis-p.oh)}) · ${esc(p.userName)} ${fdt(p.ts)}</div>`:''}
+  <div class="row" style="margin-top:8px"><input class="inp grow" id="ajF" inputmode="numeric" placeholder="Cantidad física contada" value="${p?p.fis:''}"><button class="btn pri" id="ajOk" data-ajsku="${esc(x.sku)}">Guardar</button></div></div>`;}
+function adjSave(sku,val){const x=PR[BYSKU.get(sku)];if(!x)return false;if(val===''||isNaN(+val)){toast('Escribe la cantidad contada','err');return false;}
+  const L=AJ.all().filter(a=>!(a.sku===sku&&!a.done));const as=S.aisles().filter(a=>a.cats.includes(x.cla)).map(a=>a.name).join(', ');
+  L.unshift({id:uid(),sku:x.sku,gtin:x.gtin,desc:x.desc,cla:x.cla,aisle:as,oh:x.oh,fis:+val,userId:ME.id,userName:ME.name,ts:Date.now(),done:false,upd:Date.now()});AJ.set(L);
+  toast('Conteo guardado: '+fmt(+val)+' (sistema '+fmt(x.oh)+')','ok');return true;}
+document.addEventListener('click',e=>{const b=e.target.closest('#ajOk');if(!b)return;const sh=b.closest('.sheet');if(adjSave(b.dataset.ajsku,sh.querySelector('#ajF').value.trim()))sh.remove();});
+let AJV='pend';
+function adjSheet(){const L=AJ.all();const P=L.filter(a=>!a.done),D=L.filter(a=>a.done).slice(0,200);const show=AJV==='pend'?P:D;
+  const g=new Map();for(const a of show){const k=a.aisle||'Sin pasillo';if(!g.has(k))g.set(k,[]);g.get(k).push(a);}
+  const sh=sheet(`<h2>📝 Ajustes de stock</h2><div class="sub">Conteos físicos que no cuadran con el sistema. Exporta el archivo para ajustar en el sistema y luego márcalos como ajustados.</div>
+   <div class="row" style="gap:6px;margin:10px 0"><button class="btn sm ${AJV==='pend'?'pri':''}" data-aj="pend">Pendientes (${P.length})</button><button class="btn sm ${AJV==='done'?'pri':''}" data-aj="done">Ajustados (${D.length})</button></div>
+   ${AJV==='pend'&&P.length?`<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:8px"><button class="btn pri" id="ajCsv">⇣ Exportar Excel (CSV)</button>${isAdmin()?'<button class="btn" id="ajDone">✓ Marcar todos como ajustados</button>':''}</div>`:''}
+   ${show.length?[...g].map(([k,ls])=>`<div class="sec">${esc(k)}</div>`+ls.map(a=>{const d=a.fis-a.oh;return `<div class="it" data-ajid="${a.id}"><div class="grow"><div class="d">${esc(a.desc)}</div><div class="c">${esc(short(a.cla))} · ${esc(a.gtin)} · ${esc(a.userName)} ${fdt(a.ts)}</div></div><div style="text-align:right;font-size:12px">sist. ${fmt(a.oh)}<br>físico <b>${fmt(a.fis)}</b><br><b style="color:${d>0?'var(--g)':'var(--red)'}">${d>0?'+':''}${fmt(d)}</b></div>${AJV==='pend'&&(isAdmin()||a.userId===ME.id)?`<button class="btn sm" data-ajdel="${a.id}" style="margin-left:6px">✕</button>`:''}</div>`;}).join('')).join(''):'<div class="empty">No hay conteos '+(AJV==='pend'?'pendientes':'ajustados')+'</div>'}`);
+  sh.querySelectorAll('[data-aj]').forEach(b=>b.onclick=()=>{AJV=b.dataset.aj;sh.remove();adjSheet();});
+  sh.querySelectorAll('[data-ajdel]').forEach(b=>b.onclick=()=>{if(!confirm('¿Borrar este conteo?'))return;AJ.set(AJ.all().filter(a=>a.id!==b.dataset.ajdel));sh.remove();adjSheet();});
+  const c=sh.querySelector('#ajCsv');if(c)c.onclick=()=>csvDownload('ajustes_stock_'+HOME_LOCAL+'_'+dayStr(Date.now())+'.csv',[['Local','SKU','GTIN','Descripcion','Clase','Pasillo','OH sistema','Stock fisico','Diferencia','Usuario','Fecha'],...P.map(a=>[HOME_LOCAL,a.sku,a.gtin,a.desc,a.cla,a.aisle,a.oh,a.fis,a.fis-a.oh,a.userName,fdt(a.ts)])]);
+  const dn=sh.querySelector('#ajDone');if(dn)dn.onclick=()=>{if(!confirm('¿Marcar los '+P.length+' conteos como ya ajustados en el sistema?'))return;const now=Date.now();AJ.set(AJ.all().map(a=>a.done?a:Object.assign(a,{done:true,doneAt:now,doneBy:ME.name,upd:now})));sh.remove();toast('Marcados como ajustados','ok');};}
 function vHome(){const A=S.aisles().filter(a=>a.active!==false);const L=latestByClass(7);
   const rev=new Set([...L.values()].map(r=>r.aisleId)).size;const pend=pending(7);
   const today=new Date().toLocaleDateString('es-PE',{weekday:'long',day:'numeric',month:'long'});
@@ -496,11 +518,12 @@ function vHome(){const A=S.aisles().filter(a=>a.active!==false);const L=latestBy
    ${isAdmin()?act('👥','b','Usuarios','Altas, roles y contraseñas','aUsers'):''}
    ${isAdmin()?act('☁️','g','Sincronización',syncUrl()?(SYNC_ERR?'Sin conexión con la hoja':'Activada con Google Sheets'):'Desactivada · conectar con Google Sheets','aSy'):''}
    ${isAdmin()?act('🔄','v','Compartir datos por archivo','Exportar o importar pasillos, usuarios y recorridas','aBk'):''}
+   ${act('📝','b','Ajustes de stock',(AJ.all().filter(a=>!a.done).length||'Sin')+' conteo(s) físico(s) pendiente(s) · exportar para ajustar','aAdj')}
    ${act('🗓️','y','Datos de stock','Reporte del '+esc(((DB.meta.rango||'').match(/al (\S+)/)||[])[1]||'')+(isAdmin()?' · cargar reporte nuevo':''),'aData')}</div>`;
   const c=$('#hCont');if(c)c.onclick=()=>go('scan',{rec:open[0].id});
   const cs=$('#hCsv');if(cs)cs.onclick=()=>csvPending(pend);
   $$('[data-pa]').forEach(e=>e.onclick=()=>go('rep','repo'));
-  $('#aScan').onclick=()=>go('scan');const u=$('#aUsers');if(u)u.onclick=()=>go('users');const b=$('#aBk');if(b)b.onclick=backupSheet;const sy=$('#aSy');if(sy)sy.onclick=syncSheet;$('#aData').onclick=dataSheet;}
+  $('#aScan').onclick=()=>go('scan');const u=$('#aUsers');if(u)u.onclick=()=>go('users');const b=$('#aBk');if(b)b.onclick=backupSheet;const sy=$('#aSy');if(sy)sy.onclick=syncSheet;$('#aData').onclick=dataSheet;$('#aAdj').onclick=adjSheet;}
 function csvPending(pend){csvDownload('reposicion_pendiente.csv',[['Pasillo','Clase','SKU','GTIN','Descripcion','OH','Recorrida','Usuario'],...pend.map(p=>{const x=PR[BYSKU.get(p.f.s)]||{};return [p.a.name,short(p.c),p.f.s,x.gtin||'',p.f.d,p.f.oh,fdt(p.r.end),p.r.userName];})]);}
 function dataSheet(){const fi=(DB.meta.fechaImpresion||'');
   const sh=sheet(`<h2>Datos de stock</h2><div class="card sub"><b>${esc(DB.meta.empresa)}</b> — ${esc(DB.meta.reporte)}<br>${esc(DB.meta.rango)} (${DAYS} días)<br>Impreso: ${esc(fi)}<br>Archivos: ${esc((DB.meta.archivos||[]).join(', '))}<br>${fmt(PR.length)} productos en ${esc(HOME_LOCAL)}</div>
@@ -609,8 +632,8 @@ function scanUI(){VIEW='scan';$$('#nav button').forEach(b=>b.classList.toggle('o
 function handMark(){const r=REC;const L=planOf({cats:r.classes});
   const sh=sheet(`<h2>Marcar a mano</h2><div class="sub">Toca un producto para marcarlo como presente (igual que si lo pistolearas). Tócalo otra vez para quitarlo.</div><input class="inp" id="hQ" placeholder="Buscar por descripción, marca o código" style="margin:10px 0"><div id="hL"></div>`);
   const draw=()=>{const q=sh.querySelector('#hQ').value.trim().toLowerCase();const F=L.filter(x=>!q||(x.desc+' '+x.marca+' '+x.gtin+' '+x.sku).toLowerCase().includes(q)).sort((a,b)=>(!!r.scans[a.sku])-(!!r.scans[b.sku])||a.cla.localeCompare(b.cla)||a.desc.localeCompare(b.desc));
-    sh.querySelector('#hL').innerHTML=F.slice(0,300).map(x=>`<div class="it" data-h="${esc(x.sku)}" style="cursor:pointer"><div style="font-size:20px;width:28px">${r.scans[x.sku]?'✅':'⬜'}</div><div class="grow"><div class="d">${esc(x.desc)}</div><div class="c">${esc(short(x.cla))} · ${esc(x.gtin||x.sku)}</div></div><span class="oh ${x.oh>0?'':'z'}">OH: ${fmt(x.oh)}</span></div>`).join('')+(F.length>300?'<div class="sub">Mostrando 300 de '+fmt(F.length)+'. Usa el buscador.</div>':'');
-    sh.querySelectorAll('[data-h]').forEach(e=>e.onclick=()=>{const s=e.dataset.h;if(r.scans[s])delete r.scans[s];else r.scans[s]=Date.now();saveRec();renderPres();draw();});};
+    sh.querySelector('#hL').innerHTML=F.slice(0,300).map(x=>`<div class="it" data-h="${esc(x.sku)}" style="cursor:pointer"><div style="font-size:20px;width:28px">${r.scans[x.sku]?'✅':'⬜'}</div><div class="grow"><div class="d">${esc(x.desc)}</div><div class="c">${esc(short(x.cla))} · ${esc(x.gtin||x.sku)}</div></div><span class="oh ${x.oh>0?'':'z'}">OH: ${fmt(x.oh)}</span><button class="btn sm" data-hp="${esc(x.sku)}" style="margin-left:6px" title="Stock físico">📝</button></div>`).join('')+(F.length>300?'<div class="sub">Mostrando 300 de '+fmt(F.length)+'. Usa el buscador.</div>':'');
+    sh.querySelectorAll('[data-hp]').forEach(b=>b.onclick=ev=>{ev.stopPropagation();prodSheet(b.dataset.hp);});sh.querySelectorAll('[data-h]').forEach(e=>e.onclick=()=>{const s=e.dataset.h;if(r.scans[s])delete r.scans[s];else r.scans[s]=Date.now();saveRec();renderPres();draw();});};
   sh.querySelector('#hQ').oninput=draw;draw();}
 function renderPres(){const r=REC;const ks=Object.keys(r.scans).sort((a,b)=>r.scans[b]-r.scans[a]);$('#nSc').textContent=ks.length;
   const plan=planOf({cats:r.classes});$('#nPl').textContent=`de ${fmt(plan.length)} en el plan`;$('#nBar').style.width=Math.min(100,ks.length/Math.max(1,plan.length)*100)+'%';$('#nPr').textContent=ks.length+' producto(s)';
@@ -722,7 +745,7 @@ function prodSheet(sku){const x=PR[BYSKU.get(sku)];if(!x)return;const AS=S.aisle
   <div class="kp"><div class="kpi"><div class="l">Stock (OH)</div><div class="v" style="color:${x.oh>0?'inherit':'var(--red)'}">${fmt(x.oh)}</div></div><div class="kpi"><div class="l">En camino (OO)</div><div class="v">${fmt(x.oo)}</div></div>
    <div class="kpi"><div class="l">Venta por día</div><div class="v">${fmt(x.vel,1)}</div></div><div class="kpi"><div class="l">Precio</div><div class="v">S/ ${fmt(x.pv,2)}</div></div></div>
   <div class="card"><b>Ventas por semana</b><table class="t">${x.w.map((v,i)=>`<tr><td>${esc(DB.meta.semanas[i]||'S'+(i+1))}${i===4?' (incompleta)':''}</td><td>${fmt(v)}</td></tr>`).join('')}</table></div>
-  <div class="card sub">${esc(x.div)} › ${esc(x.dep)} › ${esc(x.sub)} › ${esc(x.cla)}<br>Proveedor: ${esc(x.prov)}<br>Pasillo(s): ${AS.map(a=>esc(a.name)).join(', ')||'sin asignar'}</div>`);}
+  <div class="card sub">${esc(x.div)} › ${esc(x.dep)} › ${esc(x.sub)} › ${esc(x.cla)}<br>Proveedor: ${esc(x.prov)}<br>Pasillo(s): ${AS.map(a=>esc(a.name)).join(', ')||'sin asignar'}</div>${adjBlock(x)}`);}
 
 /* ================= REPORTES ================= */
 let RP='pasillo',RA='',RD=7,RC='',RA2='';
