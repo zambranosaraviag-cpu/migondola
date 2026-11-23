@@ -758,13 +758,13 @@ function genPlan(){const AL=S.aisles();const LD={};const ld=(tm,d)=>LD[tm+'|'+d]
     for(const x of L.filter(x=>isLib(x.c)))cl[x.c]={k:0,d:[],w:null,t:x.t,ex:1};
     const byT=new Map();for(const x of L.filter(x=>!isLib(x.c))){if(!byT.has(x.t))byT.set(x.t,[]);byT.get(x.t).push(x);}
     const gs=g=>g.reduce((s,x)=>s+x.n,0);
-    for(const [tm,G] of byT){if(tm==='per'){const SU=new Map();for(const x of G){if(!SU.has(x.s))SU.set(x.s,[]);SU.get(x.s).push(x);}const P=(SU.size>=2?splitN([...SU.values()].map(arr=>({arr,n:gs(arr)})),2).map(g=>g.flatMap(u=>u.arr)):splitN(G,2)).sort((x,y)=>gs(y)-gs(x));const cy=[[1,3,5],[2,4,6]];P.forEach((g,b)=>{g.forEach(x=>cl[x.c]={k:3,d:cy[b],w:null,t:tm});cy[b].forEach(d=>add(tm,d,gs(g)));});}
-      else{const P=splitN(G,Math.min(G.length,12)).sort((x,y)=>gs(y)-gs(x));const used=new Set();for(const g of P){const cand=DAYS7.filter(d=>!used.has(d));const C=cand.length?cand:DAYS7;const d=C.reduce((bd,d)=>(ld(tm,d)+gs(g))/DW[d]<(ld(tm,bd)+gs(g))/DW[bd]?d:bd,C[0]);used.add(d);g.forEach(x=>cl[x.c]={k:1,d:[d],w:null,t:tm});add(tm,d,gs(g));}}}
-    const ds=new Set();Object.values(cl).forEach(o=>o.d.forEach(d=>ds.add(d)));a.plan={cls:cl,days:[...ds].sort(),v:5,at:Date.now()};}
+    for(const [tm,G] of byT){if(tm==='per'){const SU=new Map();for(const x of G){if(!SU.has(x.s))SU.set(x.s,[]);SU.get(x.s).push(x);}const P=(SU.size>=2?splitN([...SU.values()].map(arr=>({arr,n:gs(arr)})),2).map(g=>g.flatMap(u=>u.arr)):splitN(G,2)).sort((x,y)=>gs(y)-gs(x));const cy=[[1,3,5],[2,4,6]];P.forEach((g,b)=>{g.forEach(x=>cl[x.c]={k:3,d:cy[b],w:null,t:tm});cy[b].forEach(d=>{add(tm,d,gs(g));add('*',d,gs(g));});});}
+      else{const P=[...G].sort((x,y)=>y.n-x.n);const used=new Set(),AL={};const sc=(d,n)=>((AL[d]||0)+n)/DW[d]+0.05*(ld(tm,d)+n)/DW[d]+0.02*(ld('*',d)+n)/DW[d];for(const x of P){const cand=DAYS7.filter(d=>!used.has(d));const C=cand.length?cand:DAYS7;const d=C.reduce((bd,d)=>sc(d,x.n)<sc(bd,x.n)?d:bd,C[0]);used.add(d);AL[d]=(AL[d]||0)+x.n;cl[x.c]={k:1,d:[d],w:null,t:tm};add(tm,d,x.n);add('*',d,x.n);}}}
+    const ds=new Set();Object.values(cl).forEach(o=>o.d.forEach(d=>ds.add(d)));a.plan={cls:cl,days:[...ds].sort(),v:6,at:Date.now()};}
   S.setAisles(AL);}
 function clsPlan(a,c){const o=a.plan&&a.plan.cls&&a.plan.cls[c];return o||{k:1,d:(a.plan&&a.plan.days&&a.plan.days.length?[a.plan.days[0]]:[1]),w:null};}
 function todayHas(a,c,ts){const o=clsPlan(a,c);if(o.k===0)return false;const d=new Date(ts||Date.now()).getDay();return o.d.includes(d)&&(o.w==null||o.w===wkPar(ts||Date.now()));}
-function ensurePlan(){try{if(!ME||!isAdmin()||!PR.length)return;const A=S.aisles();if(!A.length||A.some(a=>a.plan&&a.plan.v===5))return;genPlan();}catch(e){console.log(e);}}
+function ensurePlan(){try{if(!ME||!isAdmin()||!PR.length)return;const A=S.aisles();if(!A.length||A.some(a=>a.plan&&a.plan.v===6))return;genPlan();}catch(e){console.log(e);}}
 setTimeout(ensurePlan,8000);setInterval(ensurePlan,300000);document.addEventListener('click',e=>{const b=e.target.closest('[data-goa]');if(b)go('scan',b.dataset.gcl?{aisle:b.dataset.goa,plan:b.dataset.gcl.split('|')}:{aisle:b.dataset.goa});});
 // recorrida directa con las clases que tocan (desde Inicio)
 function planRec(aid,cls){const a=S.aisles().find(x=>x.id===aid);if(!a)return chooseScope(aid);cls=cls.filter(c=>a.cats.includes(c));if(!cls.length)return chooseScope(aid);
