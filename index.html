@@ -483,11 +483,18 @@ function scanUI(){VIEW='scan';$$('#nav button').forEach(b=>b.classList.toggle('o
   <div class="row" style="margin-bottom:10px"><button class="btn dan grow" id="sCancel">Cancelar</button><button class="btn pri grow" id="sFin">Finalizar recorrida</button></div>
   <div class="row"><input class="inp grow" id="sMan" placeholder="Código manual (o espera la cámara)" inputmode="numeric"><button class="btn pri" id="sAdd">Agregar</button></div>
   <div class="sub" style="margin:6px 2px">Los códigos repetidos se ignoran: acá se registra presencia, no cantidad.</div>
+  ${isAdmin()?'<button class="btn" id="sHand" style="width:100%;margin:4px 0 8px">✔ Marcar presentes a mano (solo admin)</button>':''}
   <div class="sec">Productos presentes <span id="nPr"></span></div><div id="pres"></div>`;
   $('#camOn').onclick=camOnF;$('#sAdd').onclick=()=>{scanCode($('#sMan').value);$('#sMan').value='';$('#sMan').focus();};
   $('#sMan').onkeydown=e=>{if(e.key==='Enter'){scanCode(e.target.value);e.target.value='';}};
   $('#sCancel').onclick=()=>{if(!confirm('¿Cancelar esta recorrida? Se borra lo escaneado.'))return;camOff();S.setRecs(S.recs().filter(x=>x.id!==REC.id));REC=null;go('scan');};
-  $('#sFin').onclick=finish;renderPres();if(r._auto){delete r._auto;camOnF();}}
+  $('#sFin').onclick=finish;const hb=$('#sHand');if(hb)hb.onclick=handMark;renderPres();if(r._auto){delete r._auto;camOnF();}}
+function handMark(){const r=REC;const L=planOf({cats:r.classes});
+  const sh=sheet(`<h2>Marcar a mano</h2><div class="sub">Toca un producto para marcarlo como presente (igual que si lo pistolearas). Tócalo otra vez para quitarlo.</div><input class="inp" id="hQ" placeholder="Buscar por descripción, marca o código" style="margin:10px 0"><div id="hL"></div>`);
+  const draw=()=>{const q=sh.querySelector('#hQ').value.trim().toLowerCase();const F=L.filter(x=>!q||(x.desc+' '+x.marca+' '+x.gtin+' '+x.sku).toLowerCase().includes(q)).sort((a,b)=>(!!r.scans[a.sku])-(!!r.scans[b.sku])||a.cla.localeCompare(b.cla)||a.desc.localeCompare(b.desc));
+    sh.querySelector('#hL').innerHTML=F.slice(0,300).map(x=>`<div class="it" data-h="${esc(x.sku)}" style="cursor:pointer"><div style="font-size:20px;width:28px">${r.scans[x.sku]?'✅':'⬜'}</div><div class="grow"><div class="d">${esc(x.desc)}</div><div class="c">${esc(short(x.cla))} · ${esc(x.gtin||x.sku)}</div></div><span class="oh ${x.oh>0?'':'z'}">OH: ${fmt(x.oh)}</span></div>`).join('')+(F.length>300?'<div class="sub">Mostrando 300 de '+fmt(F.length)+'. Usa el buscador.</div>':'');
+    sh.querySelectorAll('[data-h]').forEach(e=>e.onclick=()=>{const s=e.dataset.h;if(r.scans[s])delete r.scans[s];else r.scans[s]=Date.now();saveRec();renderPres();draw();});};
+  sh.querySelector('#hQ').oninput=draw;draw();}
 function renderPres(){const r=REC;const ks=Object.keys(r.scans).sort((a,b)=>r.scans[b]-r.scans[a]);$('#nSc').textContent=ks.length;
   const plan=planOf({cats:r.classes});$('#nPl').textContent=`de ${fmt(plan.length)} en el plan`;$('#nBar').style.width=Math.min(100,ks.length/Math.max(1,plan.length)*100)+'%';$('#nPr').textContent=ks.length+' producto(s)';
   $('#pres').innerHTML=ks.slice(0,60).map(k=>{const x=PR[BYSKU.get(k)];return x?`<div class="it"><div class="grow"><div class="d">${esc(x.desc)}</div><div class="c">${esc(x.gtin)} · ${esc(short(x.cla))}</div></div><span class="oh ${x.oh>0?'':'z'}">OH: ${fmt(x.oh)}</span></div>`:'';}).join('');}
