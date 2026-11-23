@@ -398,7 +398,7 @@ function bindRet(after){$$('[data-ret]').forEach(b=>b.onclick=e=>{e.stopPropagat
 function lotSheet(id,after){const L=QS.lots();const l=L.find(x=>x.id===id);if(!l)return;
   const sh=sheet(`<h2>${esc(l.desc)}</h2><div class="sub">${esc(l.aisleName||'')} · ${esc(short(l.cla))} · cargado por ${esc(l.userName||'')} el ${fdt(l.created)}</div>
    <label class="f">Fecha de vencimiento</label><input class="inp" type="date" id="eF" value="${l.fv}"><label class="f">Cantidad (opcional)</label><input class="inp" id="eQ" inputmode="numeric" value="${l.qty||''}">
-   <div class="row" style="margin-top:14px">${isAdmin()||l.userId===ME.id?'<button class="btn dan" id="eDel">Borrar</button>':''}<div class="grow"></div>${l.status==='retirado'?'<button class="btn" id="eUn">Deshacer retiro</button>':''}<button class="btn pri" id="eOk">Guardar</button></div>`);
+   <div class="row" style="margin-top:14px">${isAdmin()?'<button class="btn dan" id="eDel">Borrar</button>':''}<div class="grow"></div>${l.status==='retirado'?'<button class="btn" id="eUn">Deshacer retiro</button>':''}<button class="btn pri" id="eOk">Guardar</button></div>`);
   sh.querySelector('#eOk').onclick=()=>{const f=sh.querySelector('#eF').value;if(!f){toast('Pon la fecha','err');return;}l.fv=f;l.qty=+sh.querySelector('#eQ').value||0;l.upd=Date.now();QS.setLots(L);sh.remove();after();};
   const d=sh.querySelector('#eDel');if(d)d.onclick=()=>{if(!confirm('¿Borrar este registro?'))return;QS.setLots(L.filter(x=>x.id!==id));sh.remove();after();};
   const u=sh.querySelector('#eUn');if(u)u.onclick=()=>{l.status='activo';delete l.retAt;delete l.retBy;l.upd=Date.now();QS.setLots(L);sh.remove();after();};}
@@ -440,10 +440,10 @@ function qScanUI(auto){VIEW='qscan';$$('#navQ button').forEach(b=>b.classList.to
   <button class="btn pri big" id="qCam" style="padding:18px;font-size:18px">📷 Pistolear producto</button>
   <div class="row" style="margin:10px 0"><input class="inp grow" id="qMan" placeholder="Código manual" inputmode="numeric"><button class="btn pri" id="qAdd">Agregar</button></div>
   <div style="margin:6px 2px"><b style="font-size:20px">${Object.keys(r.seen).length}</b> <span class="sub">revisados · ${lots.length} con fecha corta</span></div>
-  <div class="row" style="margin-bottom:10px"><button class="btn dan grow" id="qCancel">Cancelar</button><button class="btn pri grow" id="qFin">Terminar revisión</button></div>
+  <div class="row" style="margin-bottom:10px">${isAdmin()?'<button class="btn dan grow" id="qCancel">Cancelar</button>':''}<button class="btn pri grow" id="qFin">Terminar revisión</button></div>
   <div class="sec">Fechas cargadas en esta revisión</div><div class="card" style="padding:6px 10px">${lots.length?lots.map(l=>lotRow(l,false)).join(''):'<div class="empty">Aún no cargas fechas</div>'}</div>`;
   $('#qCam').onclick=camOnF;$('#qAdd').onclick=()=>{codeIn($('#qMan').value);$('#qMan').value='';};$('#qMan').onkeydown=e=>{if(e.key==='Enter'){codeIn(e.target.value);e.target.value='';}};
-  $('#qCancel').onclick=()=>{if(!confirm('¿Cancelar esta revisión? Las fechas ya cargadas se mantienen.'))return;camOff();QS.setRevs(QS.revs().filter(x=>x.id!==r.id));QREV=null;go('qscan');};
+  if($('#qCancel'))$('#qCancel').onclick=()=>{if(!confirm('¿Cancelar esta revisión? Las fechas ya cargadas se mantienen.'))return;camOff();QS.setRevs(QS.revs().filter(x=>x.id!==r.id));QREV=null;go('qscan');};
   $('#qFin').onclick=qFinish;bindRet(()=>qScanUI());if(auto)camOnF();}
 function qFinish(){camOff();$('#fs').classList.add('hide');const r=QREV;r.open=false;r.end=Date.now();r.lots=QS.lots().filter(l=>l.revId===r.id).length;qSave();QREV=null;
   toast('Revisión terminada: '+Object.keys(r.seen).length+' revisados, '+r.lots+' con fecha corta','ok',3500);go('qhome');}
@@ -497,7 +497,7 @@ function adjSheet(){const L=AJ.all();const P=L.filter(a=>!a.done),D=L.filter(a=>
   const sh=sheet(`<h2>📝 Ajustes de stock</h2><div class="sub">Conteos físicos que no cuadran con el sistema. Exporta el archivo para ajustar en el sistema y luego márcalos como ajustados.</div>
    <div class="row" style="gap:6px;margin:10px 0"><button class="btn sm ${AJV==='pend'?'pri':''}" data-aj="pend">Pendientes (${P.length})</button><button class="btn sm ${AJV==='done'?'pri':''}" data-aj="done">Ajustados (${D.length})</button></div>
    ${AJV==='pend'&&P.length?`<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:8px"><button class="btn pri" id="ajCsv">⇣ Exportar Excel (CSV)</button>${isAdmin()?'<button class="btn" id="ajDone">✓ Marcar todos como ajustados</button>':''}</div>`:''}
-   ${show.length?[...g].map(([k,ls])=>`<div class="sec">${esc(k)}</div>`+ls.map(a=>{const d=a.fis-a.oh;return `<div class="it" data-ajid="${a.id}"><div class="grow"><div class="d">${esc(a.desc)}</div><div class="c">${esc(short(a.cla))} · ${esc(a.gtin)} · ${esc(a.userName)} ${fdt(a.ts)}</div></div><div style="text-align:right;font-size:12px">sist. ${fmt(a.oh)}<br>físico <b>${fmt(a.fis)}</b><br><b style="color:${d>0?'var(--g)':'var(--red)'}">${d>0?'+':''}${fmt(d)}</b></div>${AJV==='pend'&&(isAdmin()||a.userId===ME.id)?`<button class="btn sm" data-ajdel="${a.id}" style="margin-left:6px">✕</button>`:''}</div>`;}).join('')).join(''):'<div class="empty">No hay conteos '+(AJV==='pend'?'pendientes':'ajustados')+'</div>'}`);
+   ${show.length?[...g].map(([k,ls])=>`<div class="sec">${esc(k)}</div>`+ls.map(a=>{const d=a.fis-a.oh;return `<div class="it" data-ajid="${a.id}"><div class="grow"><div class="d">${esc(a.desc)}</div><div class="c">${esc(short(a.cla))} · ${esc(a.gtin)} · ${esc(a.userName)} ${fdt(a.ts)}</div></div><div style="text-align:right;font-size:12px">sist. ${fmt(a.oh)}<br>físico <b>${fmt(a.fis)}</b><br><b style="color:${d>0?'var(--g)':'var(--red)'}">${d>0?'+':''}${fmt(d)}</b></div>${AJV==='pend'&&isAdmin()?`<button class="btn sm" data-ajdel="${a.id}" style="margin-left:6px">✕</button>`:''}</div>`;}).join('')).join(''):'<div class="empty">No hay conteos '+(AJV==='pend'?'pendientes':'ajustados')+'</div>'}`);
   sh.querySelectorAll('[data-aj]').forEach(b=>b.onclick=()=>{AJV=b.dataset.aj;sh.remove();adjSheet();});
   sh.querySelectorAll('[data-ajdel]').forEach(b=>b.onclick=()=>{if(!confirm('¿Borrar este conteo?'))return;AJ.set(AJ.all().filter(a=>a.id!==b.dataset.ajdel));sh.remove();adjSheet();});
   const c=sh.querySelector('#ajCsv');if(c)c.onclick=()=>csvDownload('ajustes_stock_'+HOME_LOCAL+'_'+dayStr(Date.now())+'.csv',[['Local','SKU','GTIN','Descripcion','Clase','Pasillo','OH sistema','Stock fisico','Diferencia','Usuario','Fecha'],...P.map(a=>[HOME_LOCAL,a.sku,a.gtin,a.desc,a.cla,a.aisle,a.oh,a.fis,a.fis-a.oh,a.userName,fdt(a.ts)])]);
@@ -626,14 +626,14 @@ function scanUI(){VIEW='scan';$$('#nav button').forEach(b=>b.classList.toggle('o
   <button class="btn pri big" id="camOn" style="padding:18px;font-size:18px">📷 Escanear código de barras</button>
   <div class="sub" style="margin:6px 2px;text-align:center">Se abre la cámara. Si no abre, permite la cámara en el navegador (Chrome o Safari) o escribe el código abajo.</div>
   <div style="margin:10px 2px 6px"><b id="nSc" style="font-size:20px">0</b> <span class="sub">escaneados</span> <span class="sub" id="nPl"></span></div><div class="bar" style="margin-bottom:10px"><i id="nBar" style="width:0"></i></div>
-  <div class="row" style="margin-bottom:10px"><button class="btn dan grow" id="sCancel">Cancelar</button><button class="btn pri grow" id="sFin">Finalizar recorrida</button></div>
+  <div class="row" style="margin-bottom:10px">${isAdmin()?'<button class="btn dan grow" id="sCancel">Cancelar</button>':''}<button class="btn pri grow" id="sFin">Finalizar recorrida</button></div>
   <div class="row"><input class="inp grow" id="sMan" placeholder="Código manual (o espera la cámara)" inputmode="numeric"><button class="btn pri" id="sAdd">Agregar</button></div>
   <div class="sub" style="margin:6px 2px">Los códigos repetidos se ignoran: acá se registra presencia, no cantidad.</div>
   ${isAdmin()?'<button class="btn" id="sHand" style="width:100%;margin:4px 0 8px">✔ Marcar presentes a mano (solo admin)</button>':''}
   <div class="sec">Productos presentes <span id="nPr"></span></div><div id="pres"></div>`;
   $('#camOn').onclick=camOnF;$('#sAdd').onclick=()=>{scanCode($('#sMan').value);$('#sMan').value='';$('#sMan').focus();};
   $('#sMan').onkeydown=e=>{if(e.key==='Enter'){scanCode(e.target.value);e.target.value='';}};
-  $('#sCancel').onclick=()=>{if(!confirm('¿Cancelar esta recorrida? Se borra lo escaneado.'))return;camOff();S.setRecs(S.recs().filter(x=>x.id!==REC.id));REC=null;go('scan');};
+  if($('#sCancel'))$('#sCancel').onclick=()=>{if(!confirm('¿Cancelar esta recorrida? Se borra lo escaneado.'))return;camOff();S.setRecs(S.recs().filter(x=>x.id!==REC.id));REC=null;go('scan');};
   $('#sFin').onclick=finish;const hb=$('#sHand');if(hb)hb.onclick=handMark;renderPres();if(r._auto){delete r._auto;camOnF();}}
 function handMark(){const r=REC;const L=planOf({cats:r.classes});
   const sh=sheet(`<h2>Marcar a mano</h2><div class="sub">Toca un producto para marcarlo como presente (igual que si lo pistolearas). Tócalo otra vez para quitarlo.</div><input class="inp" id="hQ" placeholder="Buscar por descripción, marca o código" style="margin:10px 0"><div id="hL"></div>`);
