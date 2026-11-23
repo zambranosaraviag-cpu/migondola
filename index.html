@@ -216,7 +216,7 @@ function createParser(keepLocal,homeLocal){
 }
 // Configuración de tienda única: 372-Huacho, más CDs y tiendas cercanas para sugerir transferencias
 const HOME_LOCAL='372-Huacho';
-function keepLocal(name){const c=parseInt(name);return c===372||c===334||c===359||(c>=500&&c<800);}
+function keepLocal(name){return parseInt(name)===372;}
 if(typeof module!=='undefined') module.exports={createParser,keepLocal,HOME_LOCAL};
 
 </script>
