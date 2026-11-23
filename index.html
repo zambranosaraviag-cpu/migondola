@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#1f6f3a">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>MiGondola — 372 Huacho</title>
 <style>
 :root{--g:#16a34a;--g2:#22c55e;--gd:#1f6f3a;--bg:#f3f4f2;--card:#fff;--tx:#1f2937;--mut:#6b7280;--ln:#e5e7eb;--red:#dc2626;--ora:#ea580c;--amb:#f59e0b;--blu:#2563eb}
@@ -293,7 +297,7 @@ function applyRemote(items){const st=items.filter(x=>x.k==='d'&&x.id==='stock').
       if(c){let out=[...m.values()];if(k==='r')out.sort((a,b)=>b.start-a.start);set(out);ch=true;}}}finally{APPLYING=false;}
   if(ch){if(ME){const u=S.users().find(x=>x.id===ME.id);if(u)ME=u;}if(REC){const r=S.recs().find(x=>x.id===REC.id);if(r&&!(VIEW==='scan'&&REC.open))REC=r;}
     if(ME&&!$('#fs').classList.contains('hide'))return;if(ME&&['home','hist','rep'].includes(VIEW)&&!document.querySelector('.sheet'))go(VIEW);if(!ME)showLogin();}}
-setInterval(syncNow,25000);window.addEventListener('online',syncNow);document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncNow();});
+if('serviceWorker' in navigator&&isSecureContext&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});setInterval(syncNow,25000);window.addEventListener('online',syncNow);document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncNow();});
 function syncSheet(){const sh=sheet(`<h2>Sincronización</h2><div class="sub">Con la sincronización activada, usuarios, pasillos y recorridas se guardan en tu Google Sheets y aparecen solos en todos los celulares. Sin internet la app sigue funcionando y sube los cambios cuando vuelve la señal.</div>
   <label class="f">Link de la hoja (termina en /exec)</label><input class="inp" id="syU" value="${esc(syncUrl())}" placeholder="https://script.google.com/macros/s/…/exec">
   <div class="sub" id="syS" style="margin-top:8px">${esc(SYNC_ERR||(syncUrl()?'Estado: '+(Object.keys(LS.get('dirty',{})).length||'sin')+' cambio(s) pendiente(s)':'Sincronización desactivada'))}</div>
