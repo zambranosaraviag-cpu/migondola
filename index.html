@@ -207,6 +207,7 @@ details.tm[open]>summary .chv{transform:rotate(90deg)}.chv{color:#cbd5e1;transit
   <button data-v="scan"><svg viewBox="0 0 24 24"><path d="M4 7V5h3M17 5h3v2M20 17v2h-3M7 19H4v-2M7 9v6M10 9v6M13 9v6M16 9v6"/></svg>Escanear</button>
   <button data-v="av"><svg viewBox="0 0 24 24"><path d="M4 19h16M6 16l4-5 3 3 5-7"/></svg>Avance</button>
   <button data-v="rep"><svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>Reportes</button>
+  <button data-v="hist" style="display:none"><svg viewBox="0 0 24 24"><path d="M12 7v5l3 2M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/></svg>Historial</button>
   <button data-v="more"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>Más</button>
 </nav>
 <nav id="navQ" class="hide">
@@ -415,7 +416,7 @@ const NAVOF={hist:'av',prod:'more',ais:'more',users:'more',san:'more'};
 const TITLES={more:'Más',qhome:'Calidad',qscan:'Revisar fechas',qalert:'Alertas de retiro',qhist:'Historial calidad',mode:'MiGondola',home:'Inicio',scan:'Escanear',hist:'Historial',av:'Avance',rep:'Reportes',prod:'Productos',ais:'Pasillos',users:'Usuarios'};
 let HSTK=[],GARGS=[],GBACK=false;
 function goBack(){if(VIEW==='scan'&&!REC&&!/¿Qué pasillo/.test($('#main').textContent)||VIEW==='scan'&&REC&&!REC.open){REC=null;GBACK=true;go('scan');GBACK=false;return;}const h=HSTK.pop();GBACK=true;if(h)go(h[0],...h[1]);else go(MODE==='cal'?'qhome':'home');GBACK=false;}
-function go(v,...args){{const nb=document.querySelector('#nav [data-v="av"]');if(nb)nb.style.display=ME&&isAdmin()?'':'none';if(v==='av'&&!(ME&&isAdmin()))v='home';}if(!GBACK&&VIEW&&!(VIEW===v&&!args.length&&!GARGS.length)&&VIEW!=='mode'){HSTK.push([VIEW,GARGS]);if(HSTK.length>30)HSTK.shift();}if(v==='mode')HSTK=[];GARGS=args.filter(a=>typeof a!=='object'||(a&&!a.rec&&!a.aisle));if((VIEW==='scan'||VIEW==='qscan')&&v!==VIEW)camOff();$$('#navQ button').forEach(b=>b.classList.toggle('on',b.dataset.q===v));$('#fs').classList.add('hide');$('#toasts').innerHTML='';VIEW=v;const nv=NAVOF[v]||v;$$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===nv));
+function go(v,...args){{const AD=!!(ME&&isAdmin());const nb=document.querySelector('#nav [data-v="av"]');if(nb)nb.style.display=AD?'':'none';const nr=document.querySelector('#nav [data-v="rep"]');if(nr)nr.style.display=AD?'':'none';const nh=document.querySelector('#nav [data-v="hist"]');if(nh)nh.style.display=AD?'none':'';if(v==='av'&&!(ME&&isAdmin()))v='home';}if(!GBACK&&VIEW&&!(VIEW===v&&!args.length&&!GARGS.length)&&VIEW!=='mode'){HSTK.push([VIEW,GARGS]);if(HSTK.length>30)HSTK.shift();}if(v==='mode')HSTK=[];GARGS=args.filter(a=>typeof a!=='object'||(a&&!a.rec&&!a.aisle));if((VIEW==='scan'||VIEW==='qscan')&&v!==VIEW)camOff();$$('#navQ button').forEach(b=>b.classList.toggle('on',b.dataset.q===v));$('#fs').classList.add('hide');$('#toasts').innerHTML='';VIEW=v;const _ad=!!(ME&&isAdmin());const nv=!_ad&&v==='hist'?'hist':!_ad&&v==='rep'?'more':NAVOF[v]||v;$$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===nv));
   $('#hBack').classList.toggle('hide',['home','qhome','mode'].includes(v));$('#crumb').textContent=TITLES[v]||'MiGondola';document.title='MiGondola — '+(TITLES[v]||'');window.scrollTo(0,0);
   ({mode:vMode,qhome:vQHome,qscan:vQScan,qalert:vQAlert,qhist:vQHist,home:vHome,scan:vScan,hist:vHist,av:vAv,rep:vRep,prod:vProd,san:vSan,ais:vAis,users:vUsers,more:vMore})[v](...args);}
 document.addEventListener('click',e=>{if(e.target.closest('#avHist'))go('hist');});
@@ -622,11 +623,11 @@ function vHome(){const A=S.aisles().filter(a=>a.active!==false);const L=latestBy
   ${open.length?`<div class="sec">Recorridas abiertas (${open.length})</div><div class="card" style="border:1px solid var(--amb);padding:4px 14px">${open.map(r=>`<div class="act" data-cont="${r.id}"><div class="ic y">📷</div><div class="grow"><div class="t">${esc(r.aisleName.replace(/ - .*/,''))}${r.cls?' · '+esc(recLbl(r)):''}</div><div class="s">${r.fin?'<b style="color:#c2410c">📤 Falta enviar por WhatsApp</b> · ':''}${Object.keys(r.scans).length} escaneados · desde ${fdt(r.start)}</div></div><button class="btn pri sm" style="flex:none">${r.fin?'Enviar':'Seguir'}</button></div>`).join('')}${open.filter(r=>r.fin).length>1?`<button class="btn pri" id="sendAll" style="width:100%;margin:8px 0 4px;background:#16a34a">📤 Enviar las ${open.filter(r=>r.fin).length} por WhatsApp (un solo mensaje)</button>`:''}</div>`:''}
   ${isAdmin()?`<div class="sec">Reposición pendiente ${pend.length?'<a id="hCsv">⇣ CSV</a>':''}</div>
   <div class="card">${pend.length?[...byA].sort((a,b)=>b[1]-a[1]).map(([n,c])=>`<div class="act" data-pa="${esc(n)}"><div class="ic o">📦</div><div class="grow"><div class="t">${esc(n)}</div><div class="s">${c} producto(s) con stock en almacén para subir a góndola</div></div><div class="ch">›</div></div>`).join(''):'<div class="empty">Sin reposición pendiente. Escanea un pasillo para ver qué falta exhibir.</div>'}</div>`:""}
-  <div class="card">${act('🧮','g','Sanear stock','Ver stock del sistema y anotar el conteo físico','hSan')}${act('📝','b','Ajustes de stock',(AJ.all().filter(a=>!a.done).length||'Sin')+' conteo(s) físico(s) pendiente(s) · exportar para ajustar','aAdj')}</div>`;
+  ${isAdmin()?`<div class="card">${act('🧮','g','Sanear stock','Ver stock del sistema y anotar el conteo físico','hSan')}${act('📝','b','Ajustes de stock',(AJ.all().filter(a=>!a.done).length||'Sin')+' conteo(s) físico(s) pendiente(s) · exportar para ajustar','aAdj')}</div>`:''}`;
   $$('[data-cont]').forEach(e=>e.onclick=()=>go('scan',{rec:e.dataset.cont}));
   const cs=$('#hCsv');if(cs)cs.onclick=()=>csvPending(pend);
   $$('[data-pa]').forEach(e=>e.onclick=()=>go('rep','repo'));
-  $('#aAdj').onclick=adjSheet;$('#hSan').onclick=()=>go('san');}
+  if($('#aAdj'))$('#aAdj').onclick=adjSheet;if($('#hSan'))$('#hSan').onclick=()=>go('san');}
 function vMore(){const A=S.aisles().filter(a=>a.active!==false);const L=latestByClass(7);const rev=new Set([...L.values()].map(r=>r.aisleId)).size;const pend=pending(7);
   const AD=isAdmin();$('#main').innerHTML=`<h1>Más</h1>
   ${AD?`<div class="sec">Resumen</div>
@@ -634,7 +635,7 @@ function vMore(){const A=S.aisles().filter(a=>a.active!==false);const L=latestBy
    <div><div class="kpi" style="padding:4px"><div class="v">${A.length}</div><div class="l">Pasillos activos</div></div></div>
    <div><div class="kpi" style="padding:4px"><div class="v" style="color:var(--g)">${rev}</div><div class="l">Pasillos revisados (7 días)</div></div></div>
    <div><div class="kpi" style="padding:4px"><div class="v" style="color:#e11d48">${pend.length}</div><div class="l">Faltan por exhibir</div></div></div></div>`:''}
-  <div class="card">${AD?act('🧮','g','Sanear stock','Pistolea, mira el stock del sistema y anota el conteo físico','mSan'):''}${act('📦','o','Productos','Buscar un producto, su stock y en qué pasillo va','mProd')}
+  <div class="card">${AD?act('🧮','g','Sanear stock','Pistolea, mira el stock del sistema y anota el conteo físico','mSan'):act('📊','b','Reportes','Pasillo, reposición y stock','mRep')}${act('📦','o','Productos','Buscar un producto, su stock y en qué pasillo va','mProd')}
    ${act('🕘','b','Historial de recorridas',isAdmin()?'Todas las recorridas':'Tus recorridas','mHist')}
    ${AD?act('🗓️','y','Datos de stock','Reporte del '+esc(((DB.meta.rango||'').match(/al (\S+)/)||[])[1]||'')+' · cargar reporte nuevo','aData'):''}</div>
   ${isAdmin()?`<div class="sec">Administración</div><div class="card">${act('🗓️','v','Plan de la semana','Qué toca cada día por equipo','mWeek')}
@@ -643,7 +644,7 @@ function vMore(){const A=S.aisles().filter(a=>a.active!==false);const L=latestBy
    ${act('👥','b','Usuarios','Altas, roles, contraseñas y pasillos asignados','aUsers')}
    ${act('☁️','g','Sincronización',syncUrl()?(SYNC_ERR?'Sin conexión con la hoja':'Activada con Google Sheets'):'Desactivada · conectar con Google Sheets','aSy')}
    ${act('🔄','v','Compartir datos por archivo','Exportar o importar pasillos, usuarios y recorridas','aBk')}</div>`:''}`;
-  $('#mProd').onclick=()=>go('prod');if($('#mSan'))$('#mSan').onclick=()=>go('san');if($('#mXs'))$('#mXs').onclick=xsSheet;$('#mHist').onclick=()=>go('hist');if($('#mWeek'))$('#mWeek').onclick=()=>{const sh=sheet(weekTable());sh.querySelectorAll('.card').forEach(c=>c.style.boxShadow='none');};if($('#aData'))$('#aData').onclick=dataSheet;
+  $('#mProd').onclick=()=>go('prod');if($('#mSan'))$('#mSan').onclick=()=>go('san');if($('#mRep'))$('#mRep').onclick=()=>go('rep');if($('#mXs'))$('#mXs').onclick=xsSheet;$('#mHist').onclick=()=>go('hist');if($('#mWeek'))$('#mWeek').onclick=()=>{const sh=sheet(weekTable());sh.querySelectorAll('.card').forEach(c=>c.style.boxShadow='none');};if($('#aData'))$('#aData').onclick=dataSheet;
   const on=(id,f)=>{const e=$('#'+id);if(e)e.onclick=f;};on('mAis',()=>go('ais'));on('aUsers',()=>go('users'));on('aBk',backupSheet);on('aSy',syncSheet);}
 function csvPending(pend){csvDownload('reposicion_pendiente.csv',[['Pasillo','Clase','SKU','GTIN','Descripcion','OH','Recorrida','Usuario'],...pend.map(p=>{const x=PR[BYSKU.get(p.f.s)]||{};return [p.a.name,short(p.c),p.f.s,x.gtin||'',p.f.d,p.f.oh,fdt(p.r.end),p.r.userName];})]);}
 function dataSheet(){const fi=(DB.meta.fechaImpresion||'');
