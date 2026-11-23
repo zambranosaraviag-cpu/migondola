@@ -673,14 +673,16 @@ function computeFalt(r){const plan=planOf({cats:r.classes});const falt=[];let pr
   falt.sort((a,b)=>a.c.localeCompare(b.c)||b.v-a.v);return {falt,pres,plan:plan.length};}
 function finish(){camOff();const r=REC;Object.assign(r,computeFalt(r));r.end=Date.now();r.open=false;saveRec();result(r);}
 function result(r){const alm=r.falt.filter(f=>f.oh>0),sin=r.falt.filter(f=>f.oh<=0);const scn=Object.keys(r.scans).length;
-  $('#main').innerHTML=`<div class="card" style="background:#f0fdf4">✅ Recorrida de <b>${esc(r.aisleName)}</b>${r.cls?' (solo la clase '+esc(r.cls)+')':''} finalizada.<br>Se detectaron <b>${r.falt.length}</b> producto(s) que faltan exhibir: <b style="color:#e11d48">${alm.length} con stock en almacén (¡a reponer!)</b> y ${sin.length} sin stock.</div>
+  $('#main').innerHTML=`<div class="row" style="margin-bottom:8px"><button class="btn sm" id="rBack">‹ Volver a pasillos</button><div class="grow"></div><button class="btn sm" id="rDel" style="color:var(--red)">🗑 Descartar recorrida</button></div><div class="card" style="background:#f0fdf4">✅ Recorrida de <b>${esc(r.aisleName)}</b>${r.cls?' (solo la clase '+esc(r.cls)+')':''} finalizada.<br>Se detectaron <b>${r.falt.length}</b> producto(s) que faltan exhibir: <b style="color:#e11d48">${alm.length} con stock en almacén (¡a reponer!)</b> y ${sin.length} sin stock.</div>
   <div class="kp3"><div class="kpi"><div class="v">${scn}</div><div class="l">presentes</div></div><div class="kpi"><div class="v" style="color:#e11d48">${alm.length}</div><div class="l">en almacén</div></div><div class="kpi"><div class="v" style="color:var(--ora)">${sin.length}</div><div class="l">sin stock</div></div></div>
   <div class="sec">Faltantes — hay que reponer <a id="rCsv">⇣ CSV</a></div>${faltList(alm)}
   ${sin.length?`<details class="card"><summary><b>Sin stock en almacén (${sin.length})</b> <span class="sub">no están en góndola y el sistema tampoco tiene stock: pedir reposición</span></summary>${faltList(sin)}</details>`:''}
   ${r.rej.length?`<div class="card sub">⛔ ${r.rej.length} código(s) escaneado(s) no se registraron porque no son de esta recorrida.</div>`:''}
   <div class="row" style="flex-wrap:wrap;margin-top:12px"><button class="btn pri" id="rCont">📷 Seguir escaneando</button><button class="btn pri" id="rOther">Escanear otro pasillo</button><button class="btn" id="rHist">Ver historial</button><button class="btn" id="rShare">📤 WhatsApp</button></div>`;
   $('#rCont').onclick=()=>go('scan',{rec:r.id});$('#rOther').onclick=()=>{REC=null;go('scan');};$('#rHist').onclick=()=>go('hist');
-  $('#rCsv').onclick=()=>csvRec(r);$('#rShare').onclick=()=>shareRec(r);}
+  $('#rCsv').onclick=()=>csvRec(r);$('#rShare').onclick=()=>shareRec(r);
+  $('#rBack').onclick=()=>{REC=null;go('scan');};
+  $('#rDel').onclick=()=>{if(!confirm('¿Descartar esta recorrida? No quedará en el historial.'))return;S.setRecs(S.recs().filter(x=>x.id!==r.id));REC=null;toast('Recorrida descartada');go('scan');};}
 function faltList(L){if(!L.length)return '<div class="empty">Nada por reponer 🎉</div>';let h='',cur=null;const cnt={};L.forEach(f=>cnt[f.c]=(cnt[f.c]||0)+1);
   for(const f of L){if(f.c!==cur){cur=f.c;h+=`<div class="clsH"><span>${esc(cur)}</span><span>${cnt[cur]}</span></div>`;}const x=PR[BYSKU.get(f.s)];
     h+=`<div class="it" data-sku="${esc(f.s)}"><div class="grow"><div class="d">${esc(f.d)}</div><div class="c">${esc(x?x.gtin:f.s)}${f.v?' · vende '+fmt(f.v,1)+' un/día':''}</div></div><span class="oh ${f.oh>0?'':'z'}">OH: ${fmt(f.oh)}</span></div>`;}return h;}
