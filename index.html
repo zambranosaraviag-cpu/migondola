@@ -724,7 +724,7 @@ function vScan(o={}){
   ${my.size?'<div class="sec">Tus pasillos</div>':''}<div class="card">${A.map(aRow).join('')||`<div class="empty">No hay pasillos activos.${isAdmin()?' Créalos en la pestaña Pasillos.':' Pide a tu administrador que los cree.'}</div>`}</div>${AO.length?`<details class="card"><summary><b>Otros pasillos (${AO.length})</b></summary>${AO.map(aRow).join('')}</details>`:''}`;
   $$('[data-cont]').forEach(e=>e.onclick=()=>{REC=OPN.find(r=>r.id===e.dataset.cont);if(REC.fin)result(REC);else scanUI();});
   $$('[data-a]').forEach(e=>e.onclick=()=>chooseScope(e.dataset.a));}
-const GRP_SUB=/^J0601/; // panadería: a granel y empacada se escanean como un solo grupo
+const GRP_SUB=/^J060[12]/; // panadería (a granel, empacada) y pastelería (fresca, seca) se escanean por grupo
 function chooseScope(aid,pl){const a=S.aisles().find(x=>x.id===aid);if(!a){go('scan');return;}
   const now=Date.now();let TL;try{TL=pl&&pl.length?pl.filter(c=>a.cats.includes(c)):semRows().filter(x=>x.a.id===aid&&todayHas(x.a,x.c,now)).map(x=>x.c);}catch(e){TL=[];}TL=srt([...new Set(TL)]).filter(c=>CLS_CNT.get(c));
   const LBC=latestByClass(0);const dToday=c=>{const r=LBC.get(aid+'|'+c);return r&&dayN(r.end)===dayN(now);};
