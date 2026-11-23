@@ -573,11 +573,11 @@ function vHome(){const A=S.aisles().filter(a=>a.active!==false);const L=latestBy
   const K=todayKpi();const hr=new Date().getHours();
   $('#main').innerHTML=`<div class="hero"><div class="sub" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase">MiGondola · ${esc(HOME_LOCAL)}</div><h1>${hr<12?'Buenos días':hr<19?'Buenas tardes':'Buenas noches'}, ${esc(ME.name.split(' ')[0])}</h1><div class="sub" style="text-transform:capitalize">${today}</div></div>
   <div class="kpis"><div class="k"><div class="v">${fmt(K.prod)}</div><div class="l">Productos hoy</div></div><div class="k"><div class="v" style="color:var(--ok)">${K.pct}%</div><div class="l">Avance del día</div></div><div class="k"><div class="v" style="color:${K.late?'#b91c1c':'var(--ok)'}">${K.late}</div><div class="l">Atrasadas</div></div></div>${profBanner()}${todayCard(1)}
-  ${open.length?`<div class="card" style="border:1px solid var(--amb)"><b>Tienes ${open.length} recorrida(s) abierta(s)</b><div class="sub">${open.map(r=>esc(r.aisleName)+(r.cls?' · '+esc(recLbl(r)):'')).join(', ')}</div><button class="btn pri sm" id="hCont" style="margin-top:8px">📷 Seguir escaneando</button></div>`:''}
+  ${open.length?`<div class="sec">Recorridas abiertas (${open.length})</div><div class="card" style="border:1px solid var(--amb);padding:4px 14px">${open.map(r=>`<div class="act" data-cont="${r.id}"><div class="ic y">📷</div><div class="grow"><div class="t">${esc(r.aisleName.replace(/ - .*/,''))}${r.cls?' · '+esc(recLbl(r)):''}</div><div class="s">${Object.keys(r.scans).length} escaneados · desde ${fdt(r.start)}</div></div><button class="btn pri sm" style="flex:none">Seguir</button></div>`).join('')}</div>`:''}
   <div class="sec">Reposición pendiente ${pend.length?'<a id="hCsv">⇣ CSV</a>':''}</div>
   <div class="card">${pend.length?[...byA].sort((a,b)=>b[1]-a[1]).map(([n,c])=>`<div class="act" data-pa="${esc(n)}"><div class="ic o">📦</div><div class="grow"><div class="t">${esc(n)}</div><div class="s">${c} producto(s) con stock en almacén para subir a góndola</div></div><div class="ch">›</div></div>`).join(''):'<div class="empty">Sin reposición pendiente. Escanea un pasillo para ver qué falta exhibir.</div>'}</div>
   <div class="card">${act('📝','b','Ajustes de stock',(AJ.all().filter(a=>!a.done).length||'Sin')+' conteo(s) físico(s) pendiente(s) · exportar para ajustar','aAdj')}</div>`;
-  const c=$('#hCont');if(c)c.onclick=()=>go('scan',{rec:open[0].id});
+  $$('[data-cont]').forEach(e=>e.onclick=()=>go('scan',{rec:e.dataset.cont}));
   const cs=$('#hCsv');if(cs)cs.onclick=()=>csvPending(pend);
   $$('[data-pa]').forEach(e=>e.onclick=()=>go('rep','repo'));
   $('#aAdj').onclick=adjSheet;}
@@ -671,13 +671,13 @@ function assign(id){const L=S.aisles();const a=L.find(x=>x.id===id);const sel=ne
 let REC=null;
 function vScan(o={}){
   if(o.rec){REC=S.recs().find(r=>r.id===o.rec);if(REC){REC.open=true;REC.end=null;saveRec();return scanUI();}}
-  const open=S.recs().find(r=>r.open&&r.userId===ME.id);
+  const OPN=S.recs().filter(r=>r.open&&r.userId===ME.id);const open=OPN[0];
   const A0=S.aisles().filter(a=>a.active!==false);const my=new Set(ME.aisles||[]);const A=my.size?A0.filter(a=>my.has(a.id)):A0;const AO=my.size?A0.filter(a=>!my.has(a.id)):[];
   if(o.aisle&&o.plan)return planRec(o.aisle,o.plan);if(o.aisle)return chooseScope(o.aisle);const aRow=a=>`<div class="act" data-a="${a.id}"><div class="ic y">🗂️</div><div class="grow"><div class="t">${esc(a.name)}</div><div class="s">${esc(a.desc||'')}${a.desc?' · ':''}${fmt(planOf(a).length)} productos en el plan</div></div><div class="ch">›</div></div>`;
   $('#main').innerHTML=`${profBanner()}<h1 style="font-size:22px">¿Qué pasillo vas a revisar?</h1><div class="sub">Escanea cada producto que esté exhibido. Lo que tenga stock y no escanees, sale como "en almacén: a reponer".</div>
-  ${open?`<div class="card" style="border:1px solid var(--amb)"><b>Recorrida abierta:</b> ${esc(open.aisleName)}${open.cls?' · '+esc(recLbl(open)):''} · ${Object.keys(open.scans).length} escaneados<div class="row" style="margin-top:8px"><button class="btn pri sm" id="sCont">📷 Seguir escaneando</button></div></div>`:''}
+  ${OPN.length?`<div class="sec">Recorridas abiertas (${OPN.length})</div><div class="card" style="border:1px solid var(--amb);padding:4px 14px">${OPN.map(r=>`<div class="act" data-cont="${r.id}"><div class="ic y">📷</div><div class="grow"><div class="t">${esc(r.aisleName.replace(/ - .*/,''))}${r.cls?' · '+esc(recLbl(r)):''}</div><div class="s">${Object.keys(r.scans).length} escaneados · desde ${fdt(r.start)}</div></div><button class="btn pri sm" style="flex:none">Seguir</button></div>`).join('')}</div>`:''}
   ${my.size?'<div class="sec">Tus pasillos</div>':''}<div class="card">${A.map(aRow).join('')||`<div class="empty">No hay pasillos activos.${isAdmin()?' Créalos en la pestaña Pasillos.':' Pide a tu administrador que los cree.'}</div>`}</div>${AO.length?`<details class="card"><summary><b>Otros pasillos (${AO.length})</b></summary>${AO.map(aRow).join('')}</details>`:''}`;
-  const c=$('#sCont');if(c)c.onclick=()=>{REC=open;scanUI();};
+  $$('[data-cont]').forEach(e=>e.onclick=()=>{REC=OPN.find(r=>r.id===e.dataset.cont);scanUI();});
   $$('[data-a]').forEach(e=>e.onclick=()=>chooseScope(e.dataset.a));}
 function chooseScope(aid){const a=S.aisles().find(x=>x.id===aid);if(!a){go('scan');return;}
   const cls=srt(a.cats).filter(c=>CLS_CNT.get(c));const isNF=cls.some(c=>/^J(0[3-7]|08|09|10|11)/.test(CLS_DIV.get(c)||''));const subs=new Map();for(const c of cls){const s=CLS_SUB.get(c)||'Otros';if(!subs.has(s))subs.set(s,[]);subs.get(s).push(c);}
