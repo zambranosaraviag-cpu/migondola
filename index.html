@@ -748,7 +748,7 @@ function scanUI(){VIEW='scan';$$('#nav button').forEach(b=>b.classList.toggle('o
   <div class="row" style="margin-bottom:10px">${isAdmin()?'<button class="btn dan grow" id="sCancel">Cancelar</button>':''}<button class="btn pri grow" id="sFin">Finalizar recorrida</button></div>
   <div class="row"><input class="inp grow" id="sMan" placeholder="Código manual (o espera la cámara)" inputmode="numeric"><button class="btn pri" id="sAdd">Agregar</button></div>
   <div class="sub" style="margin:6px 2px">Los códigos repetidos se ignoran: acá se registra presencia, no cantidad.</div>
-  ${handOK(r)?`<button class="btn" id="sHand" style="width:100%;margin:4px 0 8px">✔ Marcar presentes a mano${isAdmin()?'':' (carnes, frutas y verduras, panadería, platos preparados)'}</button>`:''}
+  ${isAdmin()||handOK(r)?`<button class="btn" id="sHand" style="width:100%;margin:4px 0 8px">✔ Marcar presentes a mano${isAdmin()?'':' (carnes, frutas y verduras, panadería, platos preparados)'}</button>`:''}
   <div class="sec">Productos presentes <span id="nPr"></span></div><div id="pres"></div>`;
   $('#camOn').onclick=camOnF;$('#sAdd').onclick=()=>{scanCode($('#sMan').value);$('#sMan').value='';$('#sMan').focus();};
   $('#sMan').onkeydown=e=>{if(e.key==='Enter'){scanCode(e.target.value);e.target.value='';}};
@@ -756,7 +756,7 @@ function scanUI(){VIEW='scan';$$('#nav button').forEach(b=>b.classList.toggle('o
   $('#sFin').onclick=finish;const hb=$('#sHand');if(hb)hb.onclick=handMark;renderPres();if(r._auto){delete r._auto;camOnF();}}
 const HAND_DIV=/^J0[3467]/;
 function handOK(r){return r&&r.classes.some(c=>HAND_DIV.test(CLS_DIV.get(c)||''));}
-function handMark(){const r=REC;const L=planOf({cats:r.classes}).filter(x=>HAND_DIV.test(x.div));
+function handMark(){const r=REC;const L=planOf({cats:r.classes}).filter(x=>isAdmin()||HAND_DIV.test(x.div));
   const sh=sheet(`<h2>Marcar a mano</h2><div class="sub">Toca un producto para marcarlo como presente (igual que si lo pistolearas). Tócalo otra vez para quitarlo.</div><input class="inp" id="hQ" placeholder="Buscar por descripción, marca o código" style="margin:10px 0"><div id="hL"></div>`);
   const draw=()=>{const q=sh.querySelector('#hQ').value.trim().toLowerCase();const F=L.filter(x=>!q||(x.desc+' '+x.marca+' '+x.gtin+' '+x.sku).toLowerCase().includes(q)).sort((a,b)=>(!!r.scans[a.sku])-(!!r.scans[b.sku])||a.cla.localeCompare(b.cla)||a.desc.localeCompare(b.desc));
     sh.querySelector('#hL').innerHTML=F.slice(0,300).map(x=>`<div class="it" data-h="${esc(x.sku)}" style="cursor:pointer"><div style="font-size:20px;width:28px">${r.scans[x.sku]?'✅':'⬜'}</div><div class="grow"><div class="d">${esc(x.desc)}</div><div class="c">${esc(short(x.cla))} · ${esc(x.gtin||x.sku)}</div></div><span class="oh ${x.oh>0?'':'z'}">OH: ${fmt(x.oh)}</span><button class="btn sm" data-hp="${esc(x.sku)}" style="margin-left:6px" title="Stock físico">📝</button></div>`).join('')+(F.length>300?'<div class="sub">Mostrando 300 de '+fmt(F.length)+'. Usa el buscador.</div>':'');
