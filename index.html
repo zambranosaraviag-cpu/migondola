@@ -939,7 +939,7 @@ function addSheet(d,aid){CURSH=()=>addSheet(d,aid);const A=S.aisles().filter(a=>
 let AVD=1;const AVO=new Set();
 function avRows(days){const L=latestByClass(days);const out=[];
   for(const a of S.aisles()){if(a.active===false)continue;for(const c of a.cats){const n=CLS_CNT.get(c)||0;if(!n)continue;const r=L.get(a.id+'|'+c);let pres=0,falt=0,rp=0;
-    if(r){for(const f of r.falt)if(f.c===c&&f.oh>0){if(isRep(r,f.s))rp++;else falt++;}for(const s in r.scans){const x=PR[BYSKU.get(s)];if(x&&x.cla===c)pres++;}}
+    if(r){for(const f of r.falt)if(f.c===c&&f.oh>0&&!XSET.has(String(f.s))){if(isRep(r,f.s))rp++;else falt++;}for(const s in r.scans){const x=PR[BYSKU.get(s)];if(x&&x.cla===c)pres++;}}
     out.push({a,c,div:CLS_DIV.get(c)||'Sin división',n,r,pres,falt,rp});}}return out;}
 function semRows(){const L=latestByClass(0);const out=[];for(const a of S.aisles()){if(a.active===false)continue;for(const c of a.cats){if(!CLS_CNT.get(c)||clsPlan(a,c).k===0)continue;const r=L.get(a.id+'|'+c);out.push({a,c,div:CLS_DIV.get(c)||'Sin división',r,s:sem(a,r,c)});}}return out;}
 function semCnt(L){const o={g:0,y:0,r:0};for(const x of L)o[x.s]++;return o;}
