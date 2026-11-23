@@ -748,7 +748,7 @@ function prodSheet(sku){const x=PR[BYSKU.get(sku)];if(!x)return;const AS=S.aisle
   <div class="card sub">${esc(x.div)} › ${esc(x.dep)} › ${esc(x.sub)} › ${esc(x.cla)}<br>Proveedor: ${esc(x.prov)}<br>Pasillo(s): ${AS.map(a=>esc(a.name)).join(', ')||'sin asignar'}</div>${adjBlock(x)}`);}
 
 /* ================= REPORTES ================= */
-let RP='pasillo',RA='',RD=7,RC='',RA2='',RDV='';
+let RP='pasillo',RA='',RD=7,RC='',RA2='',RDV=[];
 const negExcl=x=>/CONCESION|OPERADORES/.test(x.cla+' '+x.sub)||/GARANTIA EXTENDIDA/.test(x.dep);
 const divCode=d=>String(d||'').split('-')[0];
 const RCH1=[['pasillo','Pasillo'],['repo','Reposición'],['rank','Ranking faltantes'],['users','Usuarios'],['dias','Días'],['comp','Comparativa'],['evo','Evolución clase']];
@@ -759,10 +759,10 @@ function vRep(k){if(k)RP=k;const A=S.aisles();if(!RA&&A.length)RA=A[0].id;
   $$('[data-rp]').forEach(b=>b.onclick=()=>vRep(b.dataset.rp));repBody();}
 const perSel=()=>`<label class="f">Recorridas de</label><select class="sel" id="rD">${[[1,'Hoy'],[7,'Últimos 7 días'],[30,'Últimos 30 días'],[0,'Todo']].map(([v,l])=>`<option value="${v}" ${RD===v?'selected':''}>${l}</option>`).join('')}</select>`;
 const aisSel=(all)=>`<label class="f">Pasillo</label><select class="sel" id="${all?'rA2':'rA'}">${all?'<option value="">Todos</option>':''}${S.aisles().map(a=>`<option value="${a.id}" ${(all?RA2:RA)===a.id?'selected':''}>${esc(a.name)}</option>`).join('')}</select>`;
-function bindSel(){const d=$('#rD');if(d)d.onchange=()=>{RD=+d.value;repBody();};const a=$('#rA');if(a)a.onchange=()=>{RA=a.value;RC='';repBody();};const a2=$('#rA2');if(a2)a2.onchange=()=>{RA2=a2.value;repBody();};const dv=$('#rDv');if(dv)dv.onchange=()=>{RDV=dv.value;repBody();};const c=$('#rC');if(c)c.onchange=()=>{RC=c.value;repBody();};}
+function bindSel(){const d=$('#rD');if(d)d.onchange=()=>{RD=+d.value;repBody();};const a=$('#rA');if(a)a.onchange=()=>{RA=a.value;RC='';repBody();};const a2=$('#rA2');if(a2)a2.onchange=()=>{RA2=a2.value;repBody();};$$('[data-dv]').forEach(b=>b.onclick=()=>{const d=b.dataset.dv;if(!d)RDV=[];else RDV=RDV.includes(d)?RDV.filter(x=>x!==d):[...RDV,d];repBody();});const c=$('#rC');if(c)c.onchange=()=>{RC=c.value;repBody();};}
 function recsIn(days){const lim=days?Date.now()-days*864e5:0;return S.recs().filter(r=>!r.open&&r.end>=lim);}
-const catScope=()=>{const a=S.aisles().find(x=>x.id===RA2);let L=a&&RP!=='prov'?PR.filter(x=>a.cats.includes(x.cla)):PR;if(RDV&&RP!=='prov')L=L.filter(x=>x.div===RDV);return L;};
-const divSel=()=>`<label class="f">División</label><select class="sel" id="rDv"><option value="">Todas</option>${[...new Set(PR.map(x=>x.div))].sort().map(d=>`<option value="${esc(d)}" ${RDV===d?'selected':''}>${esc(d)}</option>`).join('')}</select>`;
+const catScope=()=>{const a=S.aisles().find(x=>x.id===RA2);let L=a&&RP!=='prov'?PR.filter(x=>a.cats.includes(x.cla)):PR;if(RDV.length&&RP!=='prov')L=L.filter(x=>RDV.includes(x.div));return L;};
+const divSel=()=>`<label class="f">División (toca para marcar una o varias)</label><div class="row" style="flex-wrap:wrap;gap:6px"><button class="btn sm ${RDV.length?'':'pri'}" data-dv="">Todas</button>${[...new Set(PR.map(x=>x.div))].sort().map(d=>`<button class="btn sm ${RDV.includes(d)?'pri':''}" data-dv="${esc(d)}" title="${esc(d)}">${esc(divCode(d))} ${esc(short(d).slice(0,14).toLowerCase())}</button>`).join('')}</div>`;
 function repBody(){const B=$('#rBody');const A=S.aisles();let h='';
   const need=['pasillo','evo'].includes(RP)&&!A.length;if(need){B.innerHTML='<div class="card empty">Primero crea pasillos y haz recorridas.</div>';return;}
   if(RP==='pasillo'){const a=A.find(x=>x.id===RA)||A[0];RA=a.id;const L=latestByClass(RD);const rows=[];let pres=0,rep=0,tot=0;
