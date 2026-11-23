@@ -726,7 +726,7 @@ function vScan(o={}){
   $$('[data-a]').forEach(e=>e.onclick=()=>chooseScope(e.dataset.a));}
 const GRP_SUB=/^J060[12]/; // panadería (a granel, empacada) y pastelería (fresca, seca) se escanean por grupo
 const CGRP=[{n:'Repostería (chuño, decoración, horneado, harinas)',c:['J01010802','J01010803','J01010804','J01010808']},{n:'Mieles y mermeladas',c:['J01010706','J01010707']},{n:'Postres listos y premezclas',c:['J01010805','J01010806']},{n:'Conservas (comidas preparadas y vegetales)',c:['J01010201','J01010205']},{n:'Alimentos de bebé (fórmulas, cereales, colados)',c:['J02040101','J02040102','J02040103']}];
-const MOVES=[{k:'fl1',c:'J02040103',from:/^Pasillo 3 /,to:/^Pasillo 9 /}]; // clases movidas de pasillo (una sola vez)
+const MOVES=[{k:'fl1',c:'J02040103',from:/^Pasillo 3 /,to:/^Pasillo 9 /},{k:'cko1',c:'J01010604',from:/^Cajas/,to:/^Pasillo 3 /}]; // clases movidas de pasillo (una sola vez)
 function migMoves(){const AL=S.aisles();let ch=false;for(const m of MOVES){const T=AL.find(a=>m.to.test(a.name));if(!T||(T.mv||[]).includes(m.k))continue;const F=AL.find(a=>m.from.test(a.name));T.mv=[...(T.mv||[]),m.k];ch=true;if(!F)continue;const c=F.cats.find(x=>x.startsWith(m.c));if(!c)continue;F.cats=F.cats.filter(x=>x!==c);if(!T.cats.includes(c))T.cats.push(c);const o=F.plan&&F.plan.cls&&F.plan.cls[c];if(o){delete F.plan.cls[c];T.plan=T.plan||{cls:{},days:[],v:10};T.plan.cls=T.plan.cls||{};T.plan.cls[c]=o;}if(m.k==='fl1')F.desc=(F.desc||'').replace(/,? ?fórmulas lácteas/i,'');F.upd=T.upd=Date.now();}if(ch)S.setAisles(AL);}
 const cgOf=c=>CGRP.find(g=>g.c.includes(String(c).split('-')[0]));
 const cgCls=(a,g)=>a.cats.filter(c=>g.c.includes(c.split('-')[0])&&CLS_CNT.get(c));
