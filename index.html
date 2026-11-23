@@ -528,7 +528,7 @@ function vHome(){const A=S.aisles().filter(a=>a.active!==false);const L=latestBy
   const today=new Date().toLocaleDateString('es-PE',{weekday:'long',day:'numeric',month:'long'});
   const byA=new Map();for(const p of pend){const k=p.a.name;byA.set(k,(byA.get(k)||0)+1);}
   const open=S.recs().filter(r=>r.open&&r.userId===ME.id);
-  $('#main').innerHTML=`<div class="sub" style="margin-top:4px">🛒 MiGondola · ${esc(HOME_LOCAL)}</div><h1>Hola, ${esc(ME.name.split(' ')[0])}</h1><div class="sub" style="text-transform:capitalize">${today}</div>${profBanner()}
+  $('#main').innerHTML=`<div class="sub" style="margin-top:4px">🛒 MiGondola · ${esc(HOME_LOCAL)}</div><h1>Hola, ${esc(ME.name.split(' ')[0])}</h1><div class="sub" style="text-transform:capitalize">${today}</div>${profBanner()}${todayCard(1)}
   ${open.length?`<div class="card" style="border:1px solid var(--amb)"><b>Tienes ${open.length} recorrida(s) abierta(s)</b><div class="sub">${open.map(r=>esc(r.aisleName)+(r.cls?' · '+esc(short(r.cls)):'')).join(', ')}</div><button class="btn pri sm" id="hCont" style="margin-top:8px">📷 Seguir escaneando</button></div>`:''}
   <div class="sec">Resumen</div>
   <div class="card kp"><div><div class="kpi" style="padding:4px"><div class="v">${fmt(PR.filter(x=>x.act).length)}</div><div class="l">Productos activos</div></div></div>
@@ -574,13 +574,13 @@ $('#fileBk').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!
 function vAis(){if(!isAdmin()){go('home');return;}const A=S.aisles();
   $('#main').innerHTML=`<h1>Pasillos</h1><div class="card sub">Define los pasillos y asigna qué productos deben estar en cada uno. Ese "plan" es lo que la app compara contra lo escaneado.</div>
   ${A.map(a=>{const n=planOf(a).length;return `<div class="card"><div class="row"><div class="grow"><div style="font-weight:600">${esc(a.name)}</div><div class="sub">${esc(a.desc||'')}${a.desc?' · ':''}${fmt(n)} en el plan · ${a.cats.length} clase(s)</div></div><span class="badge ${a.active===false?'off':''}">${a.active===false?'inactivo':'activo'}</span></div>
-    ${act('📷','g','Escanear este pasillo','','s_'+a.id)}${act('🗂️','y','Asignar productos','Por clase o subdepartamento','p_'+a.id)}${act('✏️','v','Editar pasillo','Código, nombre, desactivar o borrar','e_'+a.id)}
+    ${act('📷','g','Escanear este pasillo','','s_'+a.id)}${act('🗂️','y','Asignar productos','Por clase o subdepartamento','p_'+a.id)}${act('📅','b','Días de revisión',(FREQ[planA(a).f]||FREQ.s1).t+' · '+planA(a).days.map(d=>DIAS[d]).join(', '),'c_'+a.id)}${act('✏️','v','Editar pasillo','Código, nombre, desactivar o borrar','e_'+a.id)}
     ${act(a.active===false?'▶️':'⏸️','o',a.active===false?'Activar':'Desactivar','','t_'+a.id)}${act('🗑️','r','Borrar pasillo','','d_'+a.id,1)}</div>`}).join('')||'<div class="card empty">Todavía no hay pasillos. Crea el primero, por ejemplo "BASICOS" con las clases Aceites, Arroz, Pastas…</div>'}
   <button class="btn pri big" id="aNew" style="margin-top:6px">＋ Nuevo pasillo</button>
   ${!A.length?'<button class="btn big" id="aAuto" style="margin-top:8px">Crear un pasillo por departamento (para empezar rápido)</button>':''}`;
   $('#aNew').onclick=()=>aisleForm(null);const au=$('#aAuto');if(au)au.onclick=()=>{const L=[];for(const[,D]of TREE)for(const[dep,Sb]of D){const cats=[];for(const[,C]of Sb)cats.push(...C);L.push({id:uid(),name:short(dep),desc:dep,active:true,cats,upd:Date.now()});}S.setAisles(L);toast(L.length+' pasillos creados','ok');vAis();};
   for(const a of A){const on=(p,f)=>{const e=document.getElementById(p+a.id);if(e)e.onclick=f;};
-    on('s_',()=>go('scan',{aisle:a.id}));on('p_',()=>assign(a.id));on('e_',()=>aisleForm(a.id));
+    on('s_',()=>go('scan',{aisle:a.id}));on('p_',()=>assign(a.id));on('e_',()=>aisleForm(a.id));on('c_',()=>planSheet(a.id));
     on('t_',()=>{const L=S.aisles();const x=L.find(z=>z.id===a.id);x.active=x.active===false;x.upd=Date.now();S.setAisles(L);vAis();});
     on('d_',()=>{if(!confirm('¿Borrar el pasillo '+a.name+'? Las recorridas anteriores se conservan en el historial.'))return;S.setAisles(S.aisles().filter(z=>z.id!==a.id));vAis();});}}
 function aisleForm(id){const L=S.aisles();const a=id?L.find(x=>x.id===id):{name:'',desc:''};
@@ -732,12 +732,45 @@ async function shareRec(r){const alm=r.falt.filter(f=>f.oh>0),pnd=sortFalt(pendO
   try{if(navigator.share){await navigator.share({text:t});return;}}catch(e){if(e.name==='AbortError')return;}
   try{await navigator.clipboard.writeText(t);toast('Lista copiada: pégala en WhatsApp','ok');}catch(e){window.open('https://wa.me/?text='+encodeURIComponent(t));}}
 
+/* ================= PLAN SEMANAL ================= */
+const DIAS=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'],DIASL=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const FREQ={d:{t:'Todos los días',g:1,lim:2},s2:{t:'2 veces por semana',g:2,lim:4},s1:{t:'1 vez por semana',g:4,lim:7}};
+function defPlan(name){const m=String(name).match(/Pasillo\s*(\d+)/i);const n=m?+m[1]:(/caja/i.test(name)?-1:0);
+  if(n>=10&&n<=16)return {f:'d',days:[1,2,3,4,5,6]};if([1,2,3].includes(n))return {f:'s2',days:[1,4]};if([4,7].includes(n))return {f:'s2',days:[2,5]};
+  const one={5:1,6:1,17:2,18:2,8:3,9:3,'-1':3,19:3,20:4,21:5,22:5};return {f:'s1',days:[one[n]||6]};}
+function planA(a){return a.plan||defPlan(a.name);}
+function ensurePlan(){try{if(!ME||!isAdmin())return;const A=S.aisles();if(!A.length||A.some(a=>a.plan))return;for(const a of A)a.plan=defPlan(a.name);S.setAisles(A);}catch(e){}}
+setTimeout(ensurePlan,8000);document.addEventListener('click',e=>{const b=e.target.closest('[data-goa]');if(b)go('scan',{aisle:b.dataset.goa});});setInterval(ensurePlan,300000);
+const dayN=ts=>{const d=new Date(ts);d.setHours(0,0,0,0);return d.getTime();};
+function ageDays(ts){return Math.round((dayN(Date.now())-dayN(ts))/864e5);}
+function sem(a,r){if(!r)return 'r';const pl=FREQ[planA(a).f]||FREQ.s1,ag=ageDays(r.end);return ag<=pl.g?'g':ag<=pl.lim?'y':'r';}
+const SEMC={g:'#16a34a',y:'#d97706',r:'#dc2626'};
+function semBadge(a,r){const s=sem(a,r);const txt=r?(ageDays(r.end)===0?'hoy':'hace '+ageDays(r.end)+' d'):'nunca';return `<span style="display:inline-block;min-width:64px;text-align:center;font-size:12px;font-weight:700;color:#fff;background:${SEMC[s]};border-radius:99px;padding:2px 8px">${s==='g'?'●':s==='y'?'▲':'■'} ${txt}</span>`;}
+function planSheet(aid){const L=S.aisles();const a=L.find(x=>x.id===aid);if(!a)return;const pl=planA(a);
+  const sh=sheet(`<h2>📅 Días de revisión</h2><div class="sub">${esc(a.name)}</div>
+   <label class="f">Frecuencia</label><select class="sel" id="plF">${Object.entries(FREQ).map(([k,v])=>`<option value="${k}" ${pl.f===k?'selected':''}>${v.t} (alerta roja a los ${v.lim} días sin revisar)</option>`).join('')}</select>
+   <label class="f">Días que toca</label><div class="chips">${[1,2,3,4,5,6,0].map(d=>`<button class="chip ${pl.days.includes(d)?'on':''}" data-pd="${d}">${DIAS[d]}</button>`).join('')}</div>
+   <div class="row" style="margin-top:16px"><button class="btn" id="plDef">Volver al plan recomendado</button><div class="grow"></div><button class="btn pri" id="plOk">Guardar</button></div>`);
+  sh.querySelectorAll('[data-pd]').forEach(b=>b.onclick=()=>b.classList.toggle('on'));
+  sh.querySelector('#plDef').onclick=()=>{a.plan=defPlan(a.name);S.setAisles(L);sh.remove();toast('Plan recomendado aplicado','ok');go(VIEW);};
+  sh.querySelector('#plOk').onclick=()=>{const days=[...sh.querySelectorAll('[data-pd].on')].map(b=>+b.dataset.pd);if(!days.length){toast('Elige al menos un día','err');return;}a.plan={f:sh.querySelector('#plF').value,days};S.setAisles(L);sh.remove();toast('Días guardados','ok');go(VIEW);};}
+
 /* ================= AVANCE ================= */
 let AVD=1;const AVO=new Set();
 function avRows(days){const L=latestByClass(days);const out=[];
   for(const a of S.aisles()){if(a.active===false)continue;for(const c of a.cats){const n=CLS_CNT.get(c)||0;if(!n)continue;const r=L.get(a.id+'|'+c);let pres=0,falt=0,rp=0;
     if(r){for(const f of r.falt)if(f.c===c&&f.oh>0){if(isRep(r,f.s))rp++;else falt++;}for(const s in r.scans){const x=PR[BYSKU.get(s)];if(x&&x.cla===c)pres++;}}
     out.push({a,c,div:CLS_DIV.get(c)||'Sin división',n,r,pres,falt,rp});}}return out;}
+function semRows(){const L=latestByClass(0);const out=[];for(const a of S.aisles()){if(a.active===false)continue;for(const c of a.cats){if(!CLS_CNT.get(c))continue;const r=L.get(a.id+'|'+c);out.push({a,c,div:CLS_DIV.get(c)||'Sin división',r,s:sem(a,r)});}}return out;}
+function semCnt(L){const o={g:0,y:0,r:0};for(const x of L)o[x.s]++;return o;}
+function semBar(o){const n=o.g+o.y+o.r||1;return `<div style="display:flex;height:10px;border-radius:9px;overflow:hidden;margin:6px 0 4px"><i style="width:${o.g/n*100}%;background:${SEMC.g}"></i><i style="width:${o.y/n*100}%;background:${SEMC.y}"></i><i style="width:${o.r/n*100}%;background:${SEMC.r}"></i></div>`;}
+function semTxt(o){return `<span style="color:${SEMC.g};font-weight:700">● ${o.g} al día</span> · <span style="color:${SEMC.y};font-weight:700">▲ ${o.y} por vencer</span> · <span style="color:${SEMC.r};font-weight:700">■ ${o.r} vencidas</span>`;}
+function todayCard(home){const wd=new Date().getDay();const A=S.aisles().filter(a=>a.active!==false&&planA(a).days.includes(wd));const SR=semRows();
+  const urg=home?[]:[...new Map(SR.filter(x=>x.s==='r'&&x.r&&!planA(x.a).days.includes(wd)).map(x=>[x.a.id,x.a])).values()];
+  const row=a=>{const L=SR.filter(x=>x.a.id===a.id);const done=L.filter(x=>x.r&&ageDays(x.r.end)===0).length;const ok=done===L.length&&L.length;
+    return `<div class="act" data-goa="${a.id}"><div class="ic ${ok?'g':done?'y':'r'}">${ok?'✓':done?'½':'·'}</div><div class="grow"><div class="t">${esc(a.name)}</div><div class="s">${done} de ${L.length} clase(s) hechas hoy · ${(FREQ[planA(a).f]||FREQ.s1).t.toLowerCase()}</div></div><div class="ch">›</div></div>`;};
+  return `<div class="card" style="border:1px solid #bfdbfe"><b>📅 Hoy ${DIASL[wd]} toca</b>${A.length?A.map(row).join(''):'<div class="sub" style="margin-top:6px">Hoy no hay pasillos programados. Aprovecha para revisar lo que está en rojo.</div>'}
+   ${urg.length?`<div class="sub" style="margin-top:8px;color:${SEMC.r};font-weight:600">Además, vencidos de otros días (ya revisados antes, pasaron su límite):</div>${urg.map(row).join('')}`:''}</div>`;}
 function avAgg(L){const o={cls:L.length,done:0,pres:0,falt:0,rp:0};for(const x of L){if(x.r)o.done++;o.pres+=x.pres;o.falt+=x.falt;o.rp+=x.rp;}
   o.av=o.cls?o.done/o.cls*100:0;const b=o.pres+o.rp+o.falt;o.cu=b?(o.pres+o.rp)/b*100:null;return o;}
 function avHead(name,o,big){const col=o.cu==null?'var(--mut)':o.cu>=95?'var(--g)':o.cu>=85?'var(--ora)':'var(--red)';
@@ -746,13 +779,15 @@ function avHead(name,o,big){const col=o.cu==null?'var(--mut)':o.cu>=95?'var(--g)
    <div class="sub" style="font-size:12px">${o.done}/${o.cls} clases revisadas (${o.av.toFixed(0)}%)${o.rp?' · '+o.rp+' repuesto(s)':''}</div></div>
    <div style="text-align:right;flex:none;min-width:70px"><div style="font-size:${big?22:18}px;font-weight:800;color:${col};line-height:1">${o.cu==null?'—':o.cu.toFixed(0)+'%'}</div><div style="font-size:11px;color:var(--mut)">cumplim.</div>
    ${o.falt?`<div style="font-size:13px;font-weight:700;color:var(--red);margin-top:2px">${o.falt} faltan</div>`:o.done?'<div style="font-size:12px;font-weight:700;color:var(--g);margin-top:2px">✓ al día</div>':''}</div></div>`;}
-function vAv(){const R=avRows(AVD),T=avAgg(R);const g=new Map();for(const x of R){if(!g.has(x.div))g.set(x.div,[]);g.get(x.div).push(x);}
+function vAv(){const R=avRows(AVD),T=avAgg(R);const SR=semRows(),SM=new Map(SR.map(x=>[x.a.id+'|'+x.c,x]));const sc=L=>semCnt(L.map(x=>SM.get(x.a.id+'|'+x.c)).filter(Boolean));const g=new Map();for(const x of R){if(!g.has(x.div))g.set(x.div,[]);g.get(x.div).push(x);}
   const det=(key,inner,head,lvl)=>`<details class="${lvl?'':'card'}" data-avk="${esc(key)}" ${AVO.has(key)?'open':''} style="${lvl?'border-top:1px solid #eef0f2;padding:8px 0 8px '+(lvl*10)+'px':''}"><summary style="list-style:none;cursor:pointer">${head}</summary><div style="margin-top:6px">${inner}</div></details>`;
   $('#main').innerHTML=`<h1>Avance</h1><div class="chips">${[[1,'Hoy'],[7,'Últimos 7 días']].map(([v,l])=>`<button class="chip ${AVD===v?'on':''}" data-avd="${v}">${l}</button>`).join('')}</div>
   <div class="sub" style="margin:6px 2px 10px">Toca una división para ver sus pasillos, y un pasillo para ver sus clases. <b>Cumplimiento</b> = productos exhibidos o repuestos sobre los que debían estar (con stock).</div>
+  ${todayCard()}
+  <div class="card"><b>🚦 Riesgo ante auditoría</b><div class="sub">Días desde la última revisión de cada clase, según la frecuencia de su pasillo.</div>${semBar(semCnt(SR))}<div style="font-size:13px">${semTxt(semCnt(SR))}</div></div>
   <div class="card">${avHead('Tienda '+HOME_LOCAL,T,1)}</div>
   ${[...g].sort((a,b)=>a[0].localeCompare(b[0])).map(([dv,L])=>{const pa=new Map();for(const x of L){if(!pa.has(x.a.id))pa.set(x.a.id,[]);pa.get(x.a.id).push(x);}
-    return det('d|'+dv,[...pa].map(([aid,LA])=>det('p|'+dv+'|'+aid,LA.sort((a,b)=>a.c.localeCompare(b.c)).map(x=>`<div class="row" ${x.r?`data-avr="${x.r.id}"`:''} style="padding:7px 0 7px 20px;border-top:1px dashed #eef0f2;font-size:13px;${x.r?'cursor:pointer':''}"><div class="grow" style="min-width:0"><div>${esc(short(x.c))}</div><div class="sub" style="font-size:11px">${x.r?fdt(x.r.end)+' · '+esc(x.r.userName)+' · '+x.pres+' presentes':'sin revisar · '+x.n+' producto(s)'}</div></div>${!x.r?'<span class="badge off">pendiente</span>':x.falt?`<span style="font-weight:800;color:var(--red)">${x.falt} faltan</span>`:'<span style="font-weight:700;color:var(--g)">✓ completo</span>'}</div>`).join(''),avHead(LA[0].a.name,avAgg(LA)),1)).join(''),avHead(dv,avAgg(L),1),0);}).join('')||'<div class="card empty">No hay pasillos activos.</div>'}`;
+    return det('d|'+dv,[...pa].map(([aid,LA])=>det('p|'+dv+'|'+aid,LA.sort((a,b)=>a.c.localeCompare(b.c)).map(x=>`<div class="row" ${x.r?`data-avr="${x.r.id}"`:''} style="padding:7px 0 7px 20px;border-top:1px dashed #eef0f2;font-size:13px;${x.r?'cursor:pointer':''}"><div class="grow" style="min-width:0"><div>${esc(short(x.c))}</div><div class="sub" style="font-size:11px">${x.r?fdt(x.r.end)+' · '+esc(x.r.userName)+' · '+x.pres+' presentes':'sin revisar en '+(AVD===1?'el día':'7 días')+' · '+x.n+' producto(s)'}</div></div><div style="text-align:right;flex:none">${(()=>{const s=SM.get(x.a.id+'|'+x.c);return semBadge(x.a,s&&s.r);})()}<div style="margin-top:3px">${!x.r?'':x.falt?`<span style="font-weight:800;color:var(--red)">${x.falt} faltan</span>`:'<span style="font-weight:700;color:var(--g)">✓ completo</span>'}</div></div></div>`).join(''),avHead(LA[0].a.name,avAgg(LA))+semBar(sc(LA)),1)).join(''),avHead(dv,avAgg(L),1)+semBar(sc(L))+`<div style="font-size:11px">${semTxt(sc(L))}</div>`,0);}).join('')||'<div class="card empty">No hay pasillos activos.</div>'}`;
   $$('[data-avd]').forEach(b=>b.onclick=()=>{AVD=+b.dataset.avd;vAv();});
   $$('[data-avk]').forEach(d=>d.addEventListener('toggle',()=>{const k=d.dataset.avk;if(d.open)AVO.add(k);else AVO.delete(k);}));
   $$('[data-avr]').forEach(e=>e.onclick=()=>recDetail(e.dataset.avr));}
