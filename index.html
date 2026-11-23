@@ -729,7 +729,7 @@ const CGRP=[{n:'Repostería (chuño, decoración, horneado, harinas)',c:['J01010
 const cgOf=c=>CGRP.find(g=>g.c.includes(String(c).split('-')[0]));
 const cgCls=(a,g)=>a.cats.filter(c=>g.c.includes(c.split('-')[0])&&CLS_CNT.get(c));
 function syncGroups(){try{if(!ME||!isAdmin())return;for(const a of S.aisles()){if(!a.plan||!a.plan.cls)continue;for(const g of CGRP){const L=cgCls(a,g);if(L.length<2)continue;const big=L.reduce((b,c)=>(CLS_CNT.get(c)||0)>(CLS_CNT.get(b)||0)?c:b,L[0]);const D=(clsPlan(a,big).d||[]);const k=JSON.stringify([...D].sort());for(const c of L)if(JSON.stringify([...(clsPlan(a,c).d||[])].sort())!==k)setClsDays(a.id,c,D,1);}}}catch(e){console.log(e);}}
-setTimeout(syncGroups,9000);
+setTimeout(syncGroups,9000);setInterval(syncGroups,30000);
 const GRP_OUT=/^J06020209/; // Complementos (velas) va aparte, fuera de Pastelería seca
 function chooseScope(aid,pl){const a=S.aisles().find(x=>x.id===aid);if(!a){go('scan');return;}
   const now=Date.now();let TL;try{TL=pl&&pl.length?pl.filter(c=>a.cats.includes(c)):semRows().filter(x=>x.a.id===aid&&todayHas(x.a,x.c,now)).map(x=>x.c);}catch(e){TL=[];}TL=srt([...new Set(TL)]).filter(c=>CLS_CNT.get(c));
@@ -898,7 +898,7 @@ function genPlan(){const AL=S.aisles();const LD={};const ld=(tm,d)=>LD[tm+'|'+d]
   S.setAisles(AL);setTimeout(syncGroups,50);}
 function clsPlan(a,c){const o=a.plan&&a.plan.cls&&a.plan.cls[c];return o||{k:1,d:[],w:null};}
 function todayHas(a,c,ts){const o=clsPlan(a,c);if(o.k===0)return false;const d=new Date(ts||Date.now()).getDay();return o.d.includes(d)&&(o.w==null||o.w===wkPar(ts||Date.now()));}
-function ensurePlan(){try{if(!ME||!isAdmin()||!PR.length)return;if(syncUrl()&&!LS.get('synced',0))return;const A=S.aisles();if(!A.length||A.some(a=>a.plan&&a.plan.v===10))return;genPlan();}catch(e){console.log(e);}}
+function ensurePlan(){try{if(!ME||!isAdmin()||!PR.length)return;setTimeout(syncGroups,100);if(syncUrl()&&!LS.get('synced',0))return;const A=S.aisles();if(!A.length||A.some(a=>a.plan&&a.plan.v===10))return;genPlan();}catch(e){console.log(e);}}
 setTimeout(ensurePlan,8000);setInterval(ensurePlan,300000);document.addEventListener('click',e=>{const b=e.target.closest('[data-goa]');if(b)go('scan',b.dataset.gcl?{aisle:b.dataset.goa,plan:b.dataset.gcl.split('|')}:{aisle:b.dataset.goa});});
 // recorrida directa con las clases que tocan (desde Inicio)
 // título corto de una recorrida (sin listar 24 clases)
@@ -970,7 +970,7 @@ function semTxt(o){return `<span style="color:${SEMC.g};font-weight:700">● ${o
 function lateDay(x,now){if(todayHas(x.a,x.c,now))return null;const wd=new Date(now).getDay(),mx=wd===0?6:wd-1,pa=(x.a.plan&&x.a.plan.at)||0;for(let b=1;b<=mx;b++){const ts=now-b*864e5;if(todayHas(x.a,x.c,ts)){const sd=new Date(ts);sd.setHours(0,0,0,0);if(+sd<dayN(pa))return null;return x.r&&x.r.end>=+sd?null:new Date(ts).getDay();}}return null;}
 const myAisles=()=>ME&&ME.role!=='admin'&&(ME.aisles||[]).length?new Set(ME.aisles):null;
 function lblCls(a,L){const dn=x=>x.r&&ageDays(x.r.end)===0,st='color:var(--g);text-decoration:line-through';const inL=new Set(L.map(x=>x.c));const seen=new Set();const out=[];
-  for(const x of L){const s=CLS_SUB.get(x.c)||'';if(s&&seen.has(s))continue;const all=s?a.cats.filter(c=>CLS_CNT.get(c)&&CLS_SUB.get(c)===s&&clsPlan(a,c).k!==0):[];
+  for(const x of L){const g=cgOf(x.c);if(g){const k='cg:'+g.n;if(seen.has(k))continue;const G=L.filter(y=>cgOf(y.c)===g);if(G.length>1){seen.add(k);const d=G.filter(dn).length;out.push(`<span style="${d===G.length?st:''}"><b>${esc(g.n)}</b></span>`);continue;}}const s=CLS_SUB.get(x.c)||'';if(s&&seen.has(s))continue;const all=s?a.cats.filter(c=>CLS_CNT.get(c)&&CLS_SUB.get(c)===s&&clsPlan(a,c).k!==0):[];
     if(s&&all.length>1&&all.every(c=>inL.has(c))){seen.add(s);const G=L.filter(y=>CLS_SUB.get(y.c)===s),d=G.filter(dn).length;out.push(`<span style="${d===G.length?st:''}"><b>${esc(short(s))}</b> (${G.length} clases${d&&d<G.length?', '+d+' hechas':''})</span>`);}
     else out.push(`<span style="${dn(x)?st:''}">${esc(short(x.c))}</span>`);}
   return out.join(', ');}
