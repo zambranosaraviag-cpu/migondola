@@ -389,7 +389,7 @@ function syncSheet(){const sh=sheet(`<h2>Sincronización</h2><div class="sub">Co
 let ME=null; const isAdmin=()=>ME&&ME.role==='admin';
 const isRep=(r,s)=>!!(r&&r.rep&&r.rep[s]);
 const pendOf=r=>r.falt.filter(f=>f.oh>0&&!isRep(r,f.s)&&!XSET.has(String(f.s)));
-const scopeTxt=r=>r.grp==='sub'?'el subdepartamento':r.grp==='plan'?'las clases':'la clase';
+const scopeTxt=r=>r.grp==='sub'?'el subdepartamento':r.grp==='plan'||r.grp==='cg'?'las clases':'la clase';
 function sortFalt(L){const tot={};for(const f of L)tot[f.c]=(tot[f.c]||0)+(f.v||0);return [...L].sort((a,b)=>(tot[b.c]-tot[a.c])||a.c.localeCompare(b.c)||(b.v||0)-(a.v||0));}
 function profInfo(){const m=((DB&&DB.meta&&DB.meta.fechaImpresion)||'').match(/(\d{1,2})-(\d{1,2})-0?(\d{2,4})/);if(!m)return null;let y=+m[3];if(y<100)y+=2000;const d=new Date(y,m[2]-1,+m[1]);const t=new Date();t.setHours(0,0,0,0);
   return {age:Math.round((t-d)/864e5),txt:String(m[1]).padStart(2,'0')+'/'+String(m[2]).padStart(2,'0')};}
@@ -725,12 +725,17 @@ function vScan(o={}){
   $$('[data-cont]').forEach(e=>e.onclick=()=>{REC=OPN.find(r=>r.id===e.dataset.cont);if(REC.fin)result(REC);else scanUI();});
   $$('[data-a]').forEach(e=>e.onclick=()=>chooseScope(e.dataset.a));}
 const GRP_SUB=/^J060[12]/; // panadería (a granel, empacada) y pastelería (fresca, seca) se escanean por grupo
+const CGRP=[{n:'Repostería (chuño, decoración, horneado, harinas)',c:['J01010802','J01010803','J01010804','J01010808']},{n:'Mieles y mermeladas',c:['J01010706','J01010707']},{n:'Postres listos y premezclas',c:['J01010805','J01010806']}];
+const cgOf=c=>CGRP.find(g=>g.c.includes(String(c).split('-')[0]));
+const cgCls=(a,g)=>a.cats.filter(c=>g.c.includes(c.split('-')[0])&&CLS_CNT.get(c));
+function syncGroups(){try{if(!ME||!isAdmin())return;for(const a of S.aisles()){if(!a.plan||!a.plan.cls)continue;for(const g of CGRP){const L=cgCls(a,g);if(L.length<2)continue;const big=L.reduce((b,c)=>(CLS_CNT.get(c)||0)>(CLS_CNT.get(b)||0)?c:b,L[0]);const D=(clsPlan(a,big).d||[]);const k=JSON.stringify([...D].sort());for(const c of L)if(JSON.stringify([...(clsPlan(a,c).d||[])].sort())!==k)setClsDays(a.id,c,D,1);}}}catch(e){console.log(e);}}
+setTimeout(syncGroups,9000);
 const GRP_OUT=/^J06020209/; // Complementos (velas) va aparte, fuera de Pastelería seca
 function chooseScope(aid,pl){const a=S.aisles().find(x=>x.id===aid);if(!a){go('scan');return;}
   const now=Date.now();let TL;try{TL=pl&&pl.length?pl.filter(c=>a.cats.includes(c)):semRows().filter(x=>x.a.id===aid&&todayHas(x.a,x.c,now)).map(x=>x.c);}catch(e){TL=[];}TL=srt([...new Set(TL)]).filter(c=>CLS_CNT.get(c));
   const LBC=latestByClass(0);const dToday=c=>{const r=LBC.get(aid+'|'+c);return r&&dayN(r.end)===dayN(now);};
   const opR=c=>S.recs().find(r=>r.open&&r.userId===ME.id&&r.aisleId===aid&&r.classes.length===1&&r.classes[0]===c);
-  const TU=[];const gi=new Map();for(const c of TL){const s=CLS_SUB.get(c)||'';if(GRP_SUB.test(s)&&!GRP_OUT.test(c)){if(!gi.has(s)){gi.set(s,TU.length);TU.push({s,cls:[]});}TU[gi.get(s)].cls.push(c);}else TU.push({cls:[c]});}
+  const TU=[];const gi=new Map();for(const c of TL){const sb=CLS_SUB.get(c)||'';const g=cgOf(c);const s=g?g.n:GRP_SUB.test(sb)&&!GRP_OUT.test(c)?sb:'';if(s){if(!gi.has(s)){gi.set(s,TU.length);TU.push({s,cg:g,cls:g?cgCls(a,g):[]});}if(!g)TU[gi.get(s)].cls.push(c);}else TU.push({cls:[c]});}
   const opU=L=>{const k=[...L].sort().join('|');return S.recs().find(r=>r.open&&r.userId===ME.id&&r.aisleId===aid&&[...r.classes].sort().join('|')===k);};
   const todayH=TU.length?`<div class="sec">Hoy toca en este pasillo (${TU.length})</div><div class="sub" style="margin:0 2px 6px">Toca una para escanear solo sus códigos.</div><div class="card" style="padding:4px 14px">${TU.map((u,i)=>{const ok=u.cls.every(dToday),o=opU(u.cls);const n=u.cls.reduce((s,c)=>s+(CLS_CNT.get(c)||0),0);return `<div class="act" data-tu="${i}"><div class="ic ${ok?'g':o?'y':'r'}" style="font-size:${ok?18:13}px;font-weight:800">${ok?'✓':o?'📷':'•'}</div><div class="grow"><div class="t">${esc(short(u.s||u.cls[0]))}</div><div class="s">${u.s?u.cls.length+' clases':esc(u.cls[0].split('-')[0])} · ${fmt(n)} productos${ok?' · <b style="color:var(--g)">hecha hoy</b>':o?' · <b style="color:#c2410c">en proceso</b>':''}</div></div><div class="ch">›</div></div>`;}).join('')}</div>`:'';
   const cls=srt(a.cats).filter(c=>CLS_CNT.get(c));const isNF=cls.some(c=>/^J(0[3-7]|08|09|10|11)/.test(CLS_DIV.get(c)||''));const subs=new Map();for(const c of cls){const s=CLS_SUB.get(c)||'Otros';if(!subs.has(s))subs.set(s,[]);subs.get(s).push(c);}
@@ -884,7 +889,7 @@ function genPlan(){const AL=S.aisles();const LD={};const ld=(tm,d)=>LD[tm+'|'+d]
         for(const u of U){const pt=PAT3.reduce((b,p)=>sc(p,u.n)<sc(b,u.n)?p:b,PAT3[0]);u.arr.forEach(x=>cl[x.c]={k:3,d:pt,w:null,t:tm});pt.forEach(d=>{AL[d]=(AL[d]||0)+u.n;add(tm,d,u.n);add('*',d,u.n);});}}
       else{const P=[...G].sort((x,y)=>y.n-x.n);const used=new Set(),AL={};const sc=(d,n)=>((AL[d]||0)+n)/DW[d]+0.05*(ld(tm,d)+n)/DW[d]+0.02*(ld('*',d)+n)/DW[d];for(const x of P){const cand=DAYS7.filter(d=>!used.has(d));const big=x.n>=BIGC;const C=big?[3,4,5]:cand.length?cand:DAYS7;const sb=d=>big?ld('*',d)+ld('big',d)*10:sc(d,x.n);const d=C.reduce((bd,d)=>sb(d)<sb(bd)?d:bd,C[0]);if(big)add('big',d,x.n);used.add(d);AL[d]=(AL[d]||0)+x.n;cl[x.c]={k:1,d:[d],w:null,t:tm};add(tm,d,x.n);add('*',d,x.n);}}}
     const ds=new Set();Object.values(cl).forEach(o=>o.d.forEach(d=>ds.add(d)));a.plan={cls:cl,days:[...ds].sort(),v:10,at:Date.now()};}
-  S.setAisles(AL);}
+  S.setAisles(AL);setTimeout(syncGroups,50);}
 function clsPlan(a,c){const o=a.plan&&a.plan.cls&&a.plan.cls[c];return o||{k:1,d:[],w:null};}
 function todayHas(a,c,ts){const o=clsPlan(a,c);if(o.k===0)return false;const d=new Date(ts||Date.now()).getDay();return o.d.includes(d)&&(o.w==null||o.w===wkPar(ts||Date.now()));}
 function ensurePlan(){try{if(!ME||!isAdmin()||!PR.length)return;if(syncUrl()&&!LS.get('synced',0))return;const A=S.aisles();if(!A.length||A.some(a=>a.plan&&a.plan.v===10))return;genPlan();}catch(e){console.log(e);}}
@@ -898,8 +903,8 @@ function recLbl(r){if(!r||!r.cls)return '';const C=r.classes||[];if(r.grp!=='pla
 function planRec(aid,cls){const a=S.aisles().find(x=>x.id===aid);if(!a)return chooseScope(aid);cls=cls.filter(c=>a.cats.includes(c));if(!cls.length)return chooseScope(aid);
   const key=[...cls].sort().join('|');const op=S.recs().find(r=>r.open&&r.userId===ME.id&&r.aisleId===aid&&[...r.classes].sort().join('|')===key);if(op){REC=op;if(op.fin)return result(op);return scanUI();}
   const subs=[...new Set(cls.map(c=>CLS_SUB.get(c)||''))];const full=subs.length===1&&subs[0]&&a.cats.filter(c=>CLS_CNT.get(c)&&CLS_SUB.get(c)===subs[0]&&!(GRP_OUT.test(c)&&!cls.includes(c))).every(c=>cls.includes(c));
-  const one=cls.length===1;const lbl=one?cls[0]:full&&cls.length>1?subs[0]:cls.map(short).join(', ');
-  REC={id:uid(),aisleId:a.id,aisleName:a.name,aisleDesc:a.desc||'',cls:lbl,grp:one?undefined:full?'sub':'plan',classes:[...cls],rep:{},userId:ME.id,userName:ME.name,start:Date.now(),end:null,open:true,scans:{},rej:[],falt:[],pres:0,plan:0,upd:Date.now()};
+  const one=cls.length===1;const cg=!one&&CGRP.find(g=>{const L=cgCls(a,g);return L.length===cls.length&&L.every(c=>cls.includes(c));});const lbl=one?cls[0]:cg?cg.n:full&&cls.length>1?subs[0]:cls.map(short).join(', ');
+  REC={id:uid(),aisleId:a.id,aisleName:a.name,aisleDesc:a.desc||'',cls:lbl,grp:one?undefined:cg?'cg':full?'sub':'plan',classes:[...cls],rep:{},userId:ME.id,userName:ME.name,start:Date.now(),end:null,open:true,scans:{},rej:[],falt:[],pres:0,plan:0,upd:Date.now()};
   const R=S.recs();R.unshift(REC);S.setRecs(R);REC._auto=1;scanUI();}
 const dayN=ts=>{const d=new Date(ts);d.setHours(0,0,0,0);return d.getTime();};
 function ageDays(ts){return Math.round((dayN(Date.now())-dayN(ts))/864e5);}
@@ -916,7 +921,7 @@ function weekTable(){const A=S.aisles().filter(a=>a.active!==false).sort((x,y)=>
 document.addEventListener('click',e=>{const b=e.target.closest('[data-gencap]');if(!b)return;if(!confirm('¿Recalcular el plan semanal? Reemplaza los días actuales según los pasillos y clases de hoy.'))return;genPlan();toast('Plan recalculado','ok');go(VIEW);});
 // ----- edición manual del plan (solo admin)
 let CURSH=null;
-function setClsDays(aid,c,days){const AL=S.aisles();const a=AL.find(x=>x.id===aid);if(!a)return;a.plan=a.plan||{cls:{},days:[],v:10};a.plan.cls=a.plan.cls||{};
+function setClsDays(aid,c,days,noG){if(!noG){const g=cgOf(c);const a0=S.aisles().find(x=>x.id===aid);if(g&&a0){for(const x of cgCls(a0,g))if(x!==c)setClsDays(aid,x,days,1);}}const AL=S.aisles();const a=AL.find(x=>x.id===aid);if(!a)return;a.plan=a.plan||{cls:{},days:[],v:10};a.plan.cls=a.plan.cls||{};
   const o=a.plan.cls[c]||{k:1,d:[],w:null,t:teamOf(c)};o.d=[...new Set(days)].sort((x,y)=>(x||7)-(y||7));if(o.d.length)o.k=Math.min(3,o.d.length);else if(o.k===0)o.k=0;o.man=1;delete o.ex;a.plan.cls[c]=o;
   const ds=new Set();Object.values(a.plan.cls).forEach(z=>(z.d||[]).forEach(d=>ds.add(d)));a.plan.days=[...ds].sort();S.setAisles(AL);}
 function unassigned(){const out=[];for(const a of S.aisles()){if(a.active===false)continue;for(const c of a.cats){if(!CLS_CNT.get(c))continue;const o=a.plan&&a.plan.cls&&a.plan.cls[c];
