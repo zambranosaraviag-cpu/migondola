@@ -812,9 +812,9 @@ function prodSheet(sku){const x=PR[BYSKU.get(sku)];if(!x)return;const AS=S.aisle
   sheet(`<h2>${esc(x.desc)}</h2><div class="sub">${esc(x.marca)} · <span data-cp="${esc(x.sku)}" style="display:inline-block;background:#dbeafe;color:#1e40af;border-radius:6px;padding:1px 6px;font-weight:700;cursor:pointer">SKU ${esc(x.sku)} 📋</span> · GTIN ${esc(x.gtin)}</div>
   <div class="row" style="margin:8px 0;flex-wrap:wrap;gap:6px"><span class="badge ${x.act?'':'off'}">${esc(x.est)}</span><span class="badge b">${esc(x.cla)}</span></div>
   <div class="kp"><div class="kpi"><div class="l">Stock (OH)</div><div class="v" style="color:${x.oh>0?'inherit':'var(--red)'}">${fmt(x.oh)}</div></div><div class="kpi"><div class="l">En camino (OO)</div><div class="v">${fmt(x.oo)}</div></div>
-   <div class="kpi"><div class="l">Venta por día</div><div class="v">${fmt(x.vel,1)}</div></div><div class="kpi"><div class="l">Precio</div><div class="v">S/ ${fmt(x.pv,2)}</div></div></div>
+   <div class="kpi"><div class="l">Venta por día</div><div class="v">${fmt(x.vel,1)}</div></div><div class="kpi"><div class="l">Precio</div><div class="v">S/ ${fmt(x.pv,2)}</div></div></div>${adjBlock(x)}
   <div class="card"><b>Ventas por semana</b><table class="t">${x.w.map((v,i)=>`<tr><td>${esc(DB.meta.semanas[i]||'S'+(i+1))}${i===4?' (incompleta)':''}</td><td>${fmt(v)}</td></tr>`).join('')}</table></div>
-  <div class="card sub">${esc(x.div)} › ${esc(x.dep)} › ${esc(x.sub)} › ${esc(x.cla)}<br>Proveedor: ${esc(x.prov)}<br>Pasillo(s): ${AS.map(a=>esc(a.name)).join(', ')||'sin asignar'}</div>${adjBlock(x)}`);}
+  <div class="card sub">${esc(x.div)} › ${esc(x.dep)} › ${esc(x.sub)} › ${esc(x.cla)}<br>Proveedor: ${esc(x.prov)}<br>Pasillo(s): ${AS.map(a=>esc(a.name)).join(', ')||'sin asignar'}</div>`);}
 
 /* ================= REPORTES ================= */
 let RP='pasillo',RA='',RD=7,RC='',RA2='',RDV=[];
