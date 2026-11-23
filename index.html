@@ -153,7 +153,7 @@ table.t td:first-child,table.t th:first-child{text-align:left}
   </div>
 </div>
 
-<header><div class="crumb" id="crumb">MiGondola</div><span id="hSync" style="font-size:12px;cursor:pointer"></span><span class="role" id="hRole"></span><button class="out" id="hOut">Salir</button></header>
+<header><div class="crumb" id="crumb">MiGondola</div><span id="hSync" style="font-size:12px;cursor:pointer"></span><button class="out" id="hMode" style="margin-right:4px"></button><span class="role" id="hRole"></span><button class="out" id="hOut">Salir</button></header>
 <main id="main"></main>
 
 <nav id="nav">
@@ -163,6 +163,12 @@ table.t td:first-child,table.t th:first-child{text-align:left}
   <button data-v="rep"><b>📊</b>Reportes</button>
   <button data-v="prod"><b>📦</b>Productos</button>
   <button data-v="ais"><b>🗂️</b>Pasillos</button>
+</nav>
+<nav id="navQ" class="hide">
+  <button data-q="qhome"><b>🏠</b>Inicio</button>
+  <button data-q="qscan"><b>🧪</b>Revisar</button>
+  <button data-q="qalert"><b>⚠️</b>Alertas</button>
+  <button data-q="qhist"><b>🕘</b>Historial</button>
 </nav>
 <input type="file" id="fileRep" accept=".gz,.txt" multiple class="hide">
 <input type="file" id="fileBk" accept=".json,.txt" class="hide">
@@ -291,12 +297,12 @@ async function syncNow(){const url=syncUrl();if(!url||SYNCING)return;SYNCING=tru
     if(Object.keys(LS.get('dirty',{})).length)setTimeout(syncNow,500);
   }catch(e){SYNC_ERR='Sin conexión con la hoja: '+e.message;}finally{SYNCING=false;syncBadge();}}
 function applyRemote(items){const st=items.filter(x=>x.k==='d'&&x.id==='stock').sort((a,b)=>b.upd-a.upd)[0];if(st)applyStock(st);const D=LS.get('dirty',{});let ch=false;APPLYING=true;
-  try{for(const k of['u','a','r']){const get=k==='u'?S.users:k==='a'?S.aisles:S.recs,set=k==='u'?S.setUsers:k==='a'?S.setAisles:S.setRecs;const L=get();const m=new Map(L.map(x=>[x.id,x]));let c=false;
+  try{const GS={u:[S.users,S.setUsers],a:[S.aisles,S.setAisles],r:[S.recs,S.setRecs],l:[QS.lots,QS.setLots],q:[QS.revs,QS.setRevs],g:[()=>LS.get('qcfg',[]),x=>LS.set('qcfg',x)]};for(const k of['u','a','r','l','q','g']){const[get,set]=GS[k];const L=get();const m=new Map(L.map(x=>[x.id,x]));let c=false;
       for(const it of items){if(it.k!==k||D[k+'|'+it.id])continue;const cur=m.get(it.id);
         if(it.del){if(cur&&(cur.upd||0)<=it.upd){m.delete(it.id);c=true;}}else if(!cur||(cur.upd||0)<it.upd){m.set(it.id,it.d);c=true;}}
-      if(c){let out=[...m.values()];if(k==='r')out.sort((a,b)=>b.start-a.start);set(out);ch=true;}}}finally{APPLYING=false;}
+      if(c){let out=[...m.values()];if(k==='r'||k==='q')out.sort((a,b)=>b.start-a.start);if(k==='l')out.sort((a,b)=>b.created-a.created);set(out);ch=true;}}}finally{APPLYING=false;}
   if(ch){if(ME){const u=S.users().find(x=>x.id===ME.id);if(u)ME=u;}if(REC){const r=S.recs().find(x=>x.id===REC.id);if(r&&!(VIEW==='scan'&&REC.open))REC=r;}
-    if(ME&&!$('#fs').classList.contains('hide'))return;if(ME&&['home','hist','rep'].includes(VIEW)&&!document.querySelector('.sheet'))go(VIEW);if(!ME)showLogin();}}
+    if(ME&&!$('#fs').classList.contains('hide'))return;if(QREV&&QREV.open){const q=QS.revs().find(x=>x.id===QREV.id);if(q)QREV=q;}if(ME&&['home','hist','rep','qhome','qalert','qhist'].includes(VIEW)&&!document.querySelector('.sheet'))go(VIEW);if(!ME)showLogin();}}
 if('serviceWorker' in navigator&&isSecureContext&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});setInterval(syncNow,25000);window.addEventListener('online',syncNow);document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncNow();});
 function syncSheet(){const sh=sheet(`<h2>Sincronización</h2><div class="sub">Con la sincronización activada, usuarios, pasillos y recorridas se guardan en tu Google Sheets y aparecen solos en todos los celulares. Sin internet la app sigue funcionando y sube los cambios cuando vuelve la señal.</div>
   <label class="f">Link de la hoja (termina en /exec)</label><input class="inp" id="syU" value="${esc(syncUrl())}" placeholder="https://script.google.com/macros/s/…/exec">
@@ -312,11 +318,11 @@ function aisleOfClass(c){return S.aisles().filter(a=>a.active!==false&&a.cats.in
 
 /* ================= navegación ================= */
 let VIEW='home';
-const TITLES={home:'Inicio',scan:'Escanear',hist:'Historial',rep:'Reportes',prod:'Productos',ais:'Pasillos',users:'Usuarios'};
-function go(v,...args){if(VIEW==='scan'&&v!=='scan')camOff();$('#fs').classList.add('hide');$('#toasts').innerHTML='';VIEW=v;$$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+const TITLES={qhome:'Calidad',qscan:'Revisar fechas',qalert:'Alertas de retiro',qhist:'Historial calidad',mode:'MiGondola',home:'Inicio',scan:'Escanear',hist:'Historial',rep:'Reportes',prod:'Productos',ais:'Pasillos',users:'Usuarios'};
+function go(v,...args){if((VIEW==='scan'||VIEW==='qscan')&&v!==VIEW)camOff();$$('#navQ button').forEach(b=>b.classList.toggle('on',b.dataset.q===v));$('#fs').classList.add('hide');$('#toasts').innerHTML='';VIEW=v;$$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
   $('#crumb').textContent=TITLES[v]||'MiGondola';document.title='MiGondola — '+(TITLES[v]||'');window.scrollTo(0,0);
-  ({home:vHome,scan:vScan,hist:vHist,rep:vRep,prod:vProd,ais:vAis,users:vUsers})[v](...args);}
-$$('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));
+  ({mode:vMode,qhome:vQHome,qscan:vQScan,qalert:vQAlert,qhist:vQHist,home:vHome,scan:vScan,hist:vHist,rep:vRep,prod:vProd,ais:vAis,users:vUsers})[v](...args);}
+$$('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));$$('#navQ button').forEach(b=>b.onclick=()=>{if(b.dataset.q==='qscan'&&QREV&&QREV.open){qScanUI();return;}go(b.dataset.q);});$('#hMode').onclick=()=>{camOff();go('mode');};
 $('#hOut').onclick=()=>{camOff();$('#fs').classList.add('hide');ME=null;LS.set('me',null);showLogin();};
 function act(ic,cls,t,s,id,red){return `<div class="act" id="${id}"><div class="ic ${cls}">${ic}</div><div class="grow"><div class="t ${red?'red':''}">${t}</div>${s?`<div class="s">${s}</div>`:''}</div><div class="ch">›</div></div>`;}
 function sheet(html){const e=document.createElement('div');e.className='sheet';e.innerHTML=`<div class="in"><button class="x">✕</button>${html}</div>`;document.body.appendChild(e);
@@ -332,8 +338,8 @@ $('#lGo').onclick=async()=>{const u=$('#lUser').value.trim().toLowerCase(),p=$('
     U.push({id:uid(),name,user:u,pass:await sha(p),role:'admin',created:Date.now()});S.setUsers(U);}
   const me=U.find(x=>x.user===u);if(!me||me.pass!==await sha(p)){toast('Usuario o contraseña incorrectos','err');return;}
   if(me.off){toast('Este usuario está desactivado','err');return;}
-  ME=me;LS.set('me',me.id);$('#login').classList.add('hide');startApp();};
-function startApp(){syncBadge();$('#hSync').onclick=()=>{if(isAdmin())syncSheet();else syncNow();};$('#hRole').textContent=isAdmin()?'ADMIN':'';$$('#nav button[data-v="ais"]').forEach(b=>b.classList.toggle('hide',!isAdmin()));go('home');}
+  ME=me;LS.set('me',me.id);$('#login').classList.add('hide');startApp(true);};
+function startApp(fromLogin){syncBadge();$('#hSync').onclick=()=>{if(isAdmin())syncSheet();else syncNow();};$('#hRole').textContent=isAdmin()?'ADMIN':'';$$('#nav button[data-v="ais"]').forEach(b=>b.classList.toggle('hide',!isAdmin()));if(fromLogin)go('mode');else setMode(MODE);}
 function vUsers(){if(!isAdmin()){go('home');return;}const U=S.users(),R=S.recs();
   $('#main').innerHTML=`<h1>Usuarios</h1><div class="sub">Altas, roles y contraseñas. Cada colaborador entra con su usuario y sus recorridas quedan a su nombre.</div>
   <div class="card">${U.map(u=>{const n=R.filter(r=>r.userId===u.id).length;return `<div class="act" data-u="${u.id}"><div class="ic g">👤</div><div class="grow"><div class="t">${esc(u.name)}</div><div class="s">@${esc(u.user)} · ${n} recorrida(s)${u.off?' · desactivado':''}</div></div><span class="badge ${u.role==='admin'?'b':'off'}">${u.role==='admin'?'admin':'empleado'}</span><div class="ch">›</div></div>`}).join('')}</div>
@@ -364,6 +370,113 @@ function pending(days){const L=latestByClass(days);const out=[];
     for(const f of r.falt)if(f.c===c&&f.oh>0)out.push({a,c,r,f});}}return out;}
 
 /* ================= INICIO ================= */
+/* ================= módulo CALIDAD (fechas de vencimiento) ================= */
+let MODE=LS.get('mode','osa'),QREV=null;
+const QS={lots:()=>LS.get('lots',[]),setLots:l=>{track('l',QS.lots(),l);LS.set('lots',l);},revs:()=>LS.get('qrevs',[]),setRevs:r=>{r=r.slice(0,800);track('q',QS.revs(),r);LS.set('qrevs',r);},
+  cfg:()=>(LS.get('qcfg',[])[0]||{id:'cal',ant:2,prox:7}),setCfg:c=>{c.upd=Date.now();const L=[c];track('g',LS.get('qcfg',[]),L);LS.set('qcfg',L);}};
+const dayStr=d=>{const x=new Date(d);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');};
+const daysTo=fv=>{const [y,m,d]=fv.split('-').map(Number);const t=new Date();t.setHours(0,0,0,0);return Math.round((new Date(y,m-1,d)-t)/864e5);};
+const fdate=fv=>{const [y,m,d]=fv.split('-');return d+'/'+m+'/'+y;};
+function lotState(l){const c=QS.cfg(),n=daysTo(l.fv);if(l.status==='retirado')return 'ret';if(n<0)return 'venc';if(n<=c.ant)return 'retirar';if(n<=c.ant+c.prox)return 'prox';return 'ok';}
+function qCounts(){const L=QS.lots().filter(l=>l.status!=='retirado');const o={venc:0,retirar:0,prox:0,ok:0};for(const l of L)o[lotState(l)]++;o.now=o.venc+o.retirar;o.act=L.length;return o;}
+function setMode(m){MODE=m;LS.set('mode',m);$('#nav').classList.toggle('hide',m!=='osa');$('#navQ').classList.toggle('hide',m!=='cal');$('#hMode').textContent=m==='cal'?'🧪 Calidad ⇄':'📦 Disponib. ⇄';go(m==='cal'?'qhome':'home');}
+function vMode(){$('#nav').classList.add('hide');$('#navQ').classList.add('hide');const q=qCounts();
+  $('#main').innerHTML=`<h1 style="font-size:22px">Hola, ${esc(ME.name.split(' ')[0])}</h1><div class="sub">¿Qué vas a trabajar?</div>
+  <div class="card" style="margin-top:12px">${act('📦','g','Disponibilidad','Pistolear pasillos: lo no exhibido con stock = reponer','mOsa')}${act('🧪','v','Calidad','Fechas de vencimiento: revisar, cargar fechas cortas y retirar'+(q.now?' · ⚠️ '+q.now+' por retirar':''),'mCal')}</div>`;
+  $('#mOsa').onclick=()=>setMode('osa');$('#mCal').onclick=()=>setMode('cal');}
+function lotRow(l,btn=true){const n=daysTo(l.fv),st=lotState(l);const col=st==='venc'||st==='retirar'?'#dc2626':st==='prox'?'#ea580c':'#16a34a';
+  const txt=st==='ret'?'retirado '+fdt(l.retAt)+' por '+esc(l.retBy||''):n<0?'venció hace '+(-n)+' día(s)':n===0?'vence HOY':'vence en '+n+' día(s)';
+  return `<div class="it" data-l="${l.id}"><div class="grow"><div class="d">${esc(l.desc)}</div><div class="c">${fdate(l.fv)} · <b style="color:${col}">${txt}</b>${l.qty?' · '+fmt(l.qty)+' und':''} · ${esc(l.userName||'')}</div></div>${btn&&st!=='ret'?`<button class="btn sm pri" data-ret="${l.id}">Retirado</button>`:''}</div>`;}
+function groupLots(L,btn){if(!L.length)return '<div class="empty">Nada por aquí 🎉</div>';const g=new Map();
+  for(const l of L){const k=l.aisleName||'Sin pasillo';if(!g.has(k))g.set(k,new Map());const m=g.get(k);if(!m.has(l.cla))m.set(l.cla,[]);m.get(l.cla).push(l);}
+  let h='';for(const[a,m]of g){h+=`<div class="sec">${esc(a)}</div><div class="card" style="padding:6px 10px">`;for(const[c,ls]of m){h+=`<div class="clsH"><span>${esc(short(c))}</span><span>${ls.length}</span></div>`+ls.sort((x,y)=>x.fv.localeCompare(y.fv)).map(l=>lotRow(l,btn)).join('');}h+='</div>';}return h;}
+function bindRet(after){$$('[data-ret]').forEach(b=>b.onclick=e=>{e.stopPropagation();const L=QS.lots();const l=L.find(x=>x.id===b.dataset.ret);if(!l)return;l.status='retirado';l.retAt=Date.now();l.retBy=ME.name;l.upd=Date.now();QS.setLots(L);toast('Marcado como retirado','ok');after();});
+  $$('[data-l]').forEach(e=>e.onclick=()=>lotSheet(e.dataset.l,after));}
+function lotSheet(id,after){const L=QS.lots();const l=L.find(x=>x.id===id);if(!l)return;
+  const sh=sheet(`<h2>${esc(l.desc)}</h2><div class="sub">${esc(l.aisleName||'')} · ${esc(short(l.cla))} · cargado por ${esc(l.userName||'')} el ${fdt(l.created)}</div>
+   <label class="f">Fecha de vencimiento</label><input class="inp" type="date" id="eF" value="${l.fv}"><label class="f">Cantidad (opcional)</label><input class="inp" id="eQ" inputmode="numeric" value="${l.qty||''}">
+   <div class="row" style="margin-top:14px">${isAdmin()||l.userId===ME.id?'<button class="btn dan" id="eDel">Borrar</button>':''}<div class="grow"></div>${l.status==='retirado'?'<button class="btn" id="eUn">Deshacer retiro</button>':''}<button class="btn pri" id="eOk">Guardar</button></div>`);
+  sh.querySelector('#eOk').onclick=()=>{const f=sh.querySelector('#eF').value;if(!f){toast('Pon la fecha','err');return;}l.fv=f;l.qty=+sh.querySelector('#eQ').value||0;l.upd=Date.now();QS.setLots(L);sh.remove();after();};
+  const d=sh.querySelector('#eDel');if(d)d.onclick=()=>{if(!confirm('¿Borrar este registro?'))return;QS.setLots(L.filter(x=>x.id!==id));sh.remove();after();};
+  const u=sh.querySelector('#eUn');if(u)u.onclick=()=>{l.status='activo';delete l.retAt;delete l.retBy;l.upd=Date.now();QS.setLots(L);sh.remove();after();};}
+function vQHome(){const q=qCounts(),c=QS.cfg();const A=S.aisles().filter(a=>a.active!==false);const R=QS.revs();const today=dayStr(Date.now());
+  const last=new Map();for(const r of R){if(r.open)continue;for(const cl of r.classes){const k=r.aisleId+'|'+cl;if(!last.has(k)||last.get(k)<r.end)last.set(k,r.end);}}
+  const open=R.find(r=>r.open&&r.userId===ME.id);
+  const rows=A.map(a=>{const cls=srt(a.cats).filter(x=>CLS_CNT.get(x));const done=cls.filter(x=>{const t=last.get(a.id+'|'+x);return t&&dayStr(t)===today;}).length;return {a,cls,done};});
+  $('#main').innerHTML=`${q.now?`<div class="card" style="background:#fef2f2;border:1px solid #fecaca;cursor:pointer" id="qAl"><b style="color:#dc2626">⚠️ ${q.now} producto(s) para retirar</b><div class="sub">${q.venc} vencido(s) y ${q.retirar} dentro de los ${c.ant} día(s) de anticipación. Toca para verlos.</div></div>`:''}
+  <div class="kp3"><div class="kpi"><div class="v" style="color:#dc2626">${q.now}</div><div class="l">retirar ya</div></div><div class="kpi"><div class="v" style="color:var(--ora)">${q.prox}</div><div class="l">próximos ${c.prox} días</div></div><div class="kpi"><div class="v">${q.act}</div><div class="l">fechas activas</div></div></div>
+  ${open?`<div class="card" style="border:1px solid var(--amb)"><b>Revisión abierta:</b> ${esc(open.aisleName)}${open.cls?' · '+esc(short(open.cls)):''}<div class="row" style="margin-top:8px"><button class="btn pri sm" id="qCont">📷 Seguir revisando</button></div></div>`:''}
+  <button class="btn pri big" id="qGo">🧪 Revisar fechas de un pasillo</button>
+  <div class="sec">Revisado hoy por pasillo</div><div class="card">${rows.map(o=>`<div class="act" data-qa="${o.a.id}"><div class="ic ${o.done===o.cls.length&&o.cls.length?'g':o.done?'y':'r'}">${o.done===o.cls.length&&o.cls.length?'✓':o.done?'½':'·'}</div><div class="grow"><div class="t">${esc(o.a.name)}</div><div class="s">${o.done} de ${o.cls.length} clase(s) revisadas hoy</div></div><div class="ch">›</div></div>`).join('')||'<div class="empty">No hay pasillos.</div>'}</div>
+  ${isAdmin()?`<div class="card">${act('⚙️','b','Días de anticipación para retiro: '+c.ant,'Se avisa para retirar '+c.ant+' día(s) antes de la fecha. Próximos: '+c.prox+' días','qCfg')}</div>`:''}`;
+  const al=$('#qAl');if(al)al.onclick=()=>go('qalert');$('#qGo').onclick=()=>go('qscan');const qc=$('#qCont');if(qc)qc.onclick=()=>{QREV=open;qScanUI();};
+  $$('[data-qa]').forEach(e=>e.onclick=()=>qAisle(e.dataset.qa,last));const cf=$('#qCfg');if(cf)cf.onclick=qCfgSheet;}
+function qAisle(aid,last){const a=S.aisles().find(x=>x.id===aid);const cls=srt(a.cats).filter(x=>CLS_CNT.get(x));const lots=QS.lots().filter(l=>l.aisleId===aid&&l.status!=='retirado');
+  const sh=sheet(`<h2>${esc(a.name)}</h2><div class="sub">Última revisión de fechas por clase</div><div style="margin-top:8px">${cls.map(c=>{const t=last.get(aid+'|'+c);const n=lots.filter(l=>l.cla===c).length;return `<div class="it"><div class="grow"><div class="d">${esc(short(c))}</div><div class="c">${t?'revisada '+fdt(t):'nunca revisada'}${n?' · '+n+' fecha(s) activa(s)':''}</div></div><button class="btn sm pri" data-qc="${esc(c)}">Revisar</button></div>`;}).join('')}</div>`);
+  sh.querySelectorAll('[data-qc]').forEach(b=>b.onclick=()=>{sh.remove();qStart(a,b.dataset.qc);});}
+function qCfgSheet(){const c=QS.cfg();const sh=sheet(`<h2>Alertas de retiro</h2><label class="f">Días antes del vencimiento para retirar</label><input class="inp" id="cA" inputmode="numeric" value="${c.ant}"><div class="sub">Ej.: 2 = el producto se avisa para retirar 2 días antes de su fecha.</div><label class="f">Mostrar como "próximos" los que vencen en los siguientes (días)</label><input class="inp" id="cP" inputmode="numeric" value="${c.prox}"><div class="row" style="margin-top:14px"><div class="grow"></div><button class="btn pri" id="cOk">Guardar</button></div>`);
+  sh.querySelector('#cOk').onclick=()=>{c.ant=Math.max(0,+sh.querySelector('#cA').value||0);c.prox=Math.max(1,+sh.querySelector('#cP').value||7);QS.setCfg(c);sh.remove();go('qhome');};}
+function vQScan(){const A=S.aisles().filter(a=>a.active!==false);const open=QS.revs().find(r=>r.open&&r.userId===ME.id);
+  $('#main').innerHTML=`<h1 style="font-size:22px">¿Qué pasillo vas a revisar?</h1><div class="sub">Pistolea los productos de la góndola. A los que tengan fecha corta les cargas la fecha de vencimiento y la app te avisa cuándo retirarlos.</div>
+  ${open?`<div class="card" style="border:1px solid var(--amb)"><b>Revisión abierta:</b> ${esc(open.aisleName)}<div class="row" style="margin-top:8px"><button class="btn pri sm" id="qCont">📷 Seguir revisando</button></div></div>`:''}
+  <div class="card">${A.map(a=>`<div class="act" data-qs="${a.id}"><div class="ic v">🧪</div><div class="grow"><div class="t">${esc(a.name)}</div><div class="s">${esc(a.desc||'')}</div></div><div class="ch">›</div></div>`).join('')}</div>`;
+  const qc=$('#qCont');if(qc)qc.onclick=()=>{QREV=open;qScanUI();};
+  $$('[data-qs]').forEach(e=>e.onclick=()=>{const a=A.find(x=>x.id===e.dataset.qs);const cls=srt(a.cats).filter(c=>CLS_CNT.get(c));
+    $('#main').innerHTML=`<h1 style="font-size:22px">¿Qué vas a revisar?</h1><div class="sub">${esc(a.name)}</div>
+    <label class="radio on" id="rAll"><input type="radio" name="sc" checked><div><b>Todo el pasillo</b></div></label>
+    <label class="radio" id="rOne"><input type="radio" name="sc"><div class="grow"><b>Solo una clase</b><label class="f">Clase</label><select class="sel" id="sCls" disabled>${cls.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select></div></label>
+    <div class="row" style="margin-top:12px"><button class="btn" id="sBack">Volver</button><button class="btn pri" id="sGo">Empezar</button></div>`;
+    const upd=one=>{$('#rAll').classList.toggle('on',!one);$('#rOne').classList.toggle('on',one);$('#sCls').disabled=!one;};
+    $('#rAll').onclick=()=>upd(false);$('#rOne').onclick=()=>upd(true);$('#sBack').onclick=()=>go('qscan');
+    $('#sGo').onclick=()=>qStart(a,$('#rOne').classList.contains('on')?$('#sCls').value:null);});}
+function qStart(a,c){QREV={id:uid(),aisleId:a.id,aisleName:a.name,cls:c,classes:c?[c]:[...a.cats],userId:ME.id,userName:ME.name,start:Date.now(),end:null,open:true,seen:{},lots:0,upd:Date.now()};
+  const R=QS.revs();R.unshift(QREV);QS.setRevs(R);VIEW='qscan';qScanUI(true);}
+function qSave(){QREV.upd=Date.now();const R=QS.revs();const i=R.findIndex(r=>r.id===QREV.id);if(i>=0)R[i]=QREV;else R.unshift(QREV);QS.setRevs(R);}
+function qScanUI(auto){VIEW='qscan';$$('#navQ button').forEach(b=>b.classList.toggle('on',b.dataset.q==='qscan'));const r=QREV;const lots=QS.lots().filter(l=>l.revId===r.id);
+  $('#main').innerHTML=`<div class="card" style="padding:10px 14px"><div style="font-weight:600">🧪 ${esc(r.aisleName)}</div>${r.cls?`<div style="color:var(--ora);font-size:12px">Solo la clase: ${esc(r.cls)}</div>`:''}<div class="sub">Revisión de fechas · ${fdt(r.start)}</div></div>
+  <button class="btn pri big" id="qCam" style="padding:18px;font-size:18px">📷 Pistolear producto</button>
+  <div class="row" style="margin:10px 0"><input class="inp grow" id="qMan" placeholder="Código manual" inputmode="numeric"><button class="btn pri" id="qAdd">Agregar</button></div>
+  <div style="margin:6px 2px"><b style="font-size:20px">${Object.keys(r.seen).length}</b> <span class="sub">revisados · ${lots.length} con fecha corta</span></div>
+  <div class="row" style="margin-bottom:10px"><button class="btn dan grow" id="qCancel">Cancelar</button><button class="btn pri grow" id="qFin">Terminar revisión</button></div>
+  <div class="sec">Fechas cargadas en esta revisión</div><div class="card" style="padding:6px 10px">${lots.length?lots.map(l=>lotRow(l,false)).join(''):'<div class="empty">Aún no cargas fechas</div>'}</div>`;
+  $('#qCam').onclick=camOnF;$('#qAdd').onclick=()=>{codeIn($('#qMan').value);$('#qMan').value='';};$('#qMan').onkeydown=e=>{if(e.key==='Enter'){codeIn(e.target.value);e.target.value='';}};
+  $('#qCancel').onclick=()=>{if(!confirm('¿Cancelar esta revisión? Las fechas ya cargadas se mantienen.'))return;camOff();QS.setRevs(QS.revs().filter(x=>x.id!==r.id));QREV=null;go('qscan');};
+  $('#qFin').onclick=qFinish;bindRet(()=>qScanUI());if(auto)camOnF();}
+function qFinish(){camOff();$('#fs').classList.add('hide');const r=QREV;r.open=false;r.end=Date.now();r.lots=QS.lots().filter(l=>l.revId===r.id).length;qSave();QREV=null;
+  toast('Revisión terminada: '+Object.keys(r.seen).length+' revisados, '+r.lots+' con fecha corta','ok',3500);go('qhome');}
+function qCode(c){c=String(c||'').trim();if(!c||!QREV)return;const x=findCode(c);
+  if(!x){fsInfo('⛔ Código '+c+' no está en la base','err');toast('⛔ Código '+c+' no está en la base','err');beep(220);return;}
+  if(!QREV.classes.includes(x.cla)){fsInfo('⛔ No es de esta revisión: '+short(x.cla),'err');toast('⛔ "'+x.desc+'" es de '+x.cla,'err',4000);beep(220);vib([60,60,60]);return;}
+  QREV.seen[x.sku]=Date.now();qSave();beep(1800);vib(70);const wasCam=!$('#fs').classList.contains('hide');if(wasCam){camOff();$('#fs').classList.add('hide');}
+  const prev=QS.lots().filter(l=>l.sku===x.sku&&l.status!=='retirado');
+  const sh=sheet(`<h2>${esc(x.desc)}</h2><div class="sub">${esc(short(x.cla))} · ${esc(x.gtin)} · OH ${fmt(x.oh)}</div>
+   ${prev.length?`<div class="card sub" style="margin-top:8px">Ya tiene fecha(s) registrada(s): ${prev.map(l=>fdate(l.fv)).join(', ')}</div>`:''}
+   <div class="sub" style="margin-top:10px">¿Tiene fecha corta?</div>
+   <label class="f">Fecha de vencimiento</label><input class="inp" type="date" id="qF" min="${dayStr(Date.now()-864e5*30)}">
+   <label class="f">Cantidad en góndola (opcional)</label><input class="inp" id="qQ" inputmode="numeric">
+   <div class="row" style="margin-top:14px;flex-wrap:wrap"><button class="btn grow" id="qNo">✓ Fecha OK, siguiente</button><button class="btn pri grow" id="qYes">Guardar fecha corta</button></div>`);
+  const next=()=>{sh.remove();qScanUI(wasCam);};sh.querySelector('.x').onclick=next;
+  sh.querySelector('#qNo').onclick=next;
+  sh.querySelector('#qYes').onclick=()=>{const f=sh.querySelector('#qF').value;if(!f){toast('Elige la fecha de vencimiento','err');return;}
+    const L=QS.lots();L.unshift({id:uid(),sku:x.sku,gtin:x.gtin,desc:x.desc,cla:x.cla,aisleId:QREV.aisleId,aisleName:QREV.aisleName,revId:QREV.id,fv:f,qty:+sh.querySelector('#qQ').value||0,userId:ME.id,userName:ME.name,created:Date.now(),status:'activo',upd:Date.now()});QS.setLots(L.slice(0,3000));
+    const n=daysTo(f);toast(n<=QS.cfg().ant?'⚠️ Guardado: hay que retirarlo YA':'Fecha guardada · vence en '+n+' día(s)',n<=QS.cfg().ant?'err':'ok',3000);next();};}
+let QTAB='now',QAF='';
+function vQAlert(){const c=QS.cfg();const A=S.aisles();let L=QS.lots();if(QAF)L=L.filter(l=>l.aisleId===QAF);
+  const sets={now:L.filter(l=>['venc','retirar'].includes(lotState(l))),prox:L.filter(l=>lotState(l)==='prox'),all:L.filter(l=>l.status!=='retirado'),ret:L.filter(l=>l.status==='retirado').sort((a,b)=>b.retAt-a.retAt).slice(0,200)};
+  const tabs=[['now','Retirar ya'],['prox','Próximos'],['all','Todas'],['ret','Retirados']];
+  $('#main').innerHTML=`<h1 style="font-size:22px">Alertas de retiro</h1><div class="sub">Se avisa ${c.ant} día(s) antes del vencimiento. Toca "Retirado" cuando lo saques de la góndola.</div>
+  <div class="row" style="flex-wrap:wrap;gap:6px;margin:10px 0">${tabs.map(([k,t])=>`<button class="btn sm ${QTAB===k?'pri':''}" data-t="${k}">${t} (${sets[k].length})</button>`).join('')}</div>
+  <select class="sel" id="qAf"><option value="">Todos los pasillos</option>${A.map(a=>`<option value="${a.id}" ${QAF===a.id?'selected':''}>${esc(a.name)}</option>`).join('')}</select>
+  ${QTAB==='now'||QTAB==='prox'?`<a id="qWa" style="display:block;margin:8px 2px;cursor:pointer">📤 Enviar lista por WhatsApp</a>`:''}
+  ${groupLots(sets[QTAB],QTAB!=='ret')}`;
+  $$('[data-t]').forEach(b=>b.onclick=()=>{QTAB=b.dataset.t;vQAlert();});$('#qAf').onchange=e=>{QAF=e.target.value;vQAlert();};bindRet(vQAlert);
+  const w=$('#qWa');if(w)w.onclick=()=>{const t='*'+(QTAB==='now'?'Retirar ya':'Próximos a vencer')+'* — '+HOME_LOCAL+'\n'+sets[QTAB].sort((a,b)=>a.fv.localeCompare(b.fv)).map(l=>'• '+l.desc+' — '+fdate(l.fv)+' ('+(l.aisleName||'')+')').join('\n');window.open('https://wa.me/?text='+encodeURIComponent(t));};}
+function vQHist(){const R=QS.revs().filter(r=>isAdmin()||r.userId===ME.id).slice(0,150);const L=QS.lots();
+  $('#main').innerHTML=`<h1 style="font-size:22px">Historial de calidad</h1><div class="card">${R.map(r=>{const n=L.filter(l=>l.revId===r.id).length;return `<div class="act" data-qh="${r.id}"><div class="ic ${r.open?'y':'v'}">🧪</div><div class="grow"><div class="t">${esc(r.aisleName)}${r.cls?' · '+esc(short(r.cls)):''}</div><div class="s">${esc(r.userName)} · ${fdt(r.start)} · ${Object.keys(r.seen||{}).length} revisados · ${n} con fecha corta${r.open?' · abierta':''}</div></div><div class="ch">›</div></div>`;}).join('')||'<div class="empty">Aún no hay revisiones</div>'}</div>`;
+  $$('[data-qh]').forEach(e=>e.onclick=()=>{const r=R.find(x=>x.id===e.dataset.qh);const ls=QS.lots().filter(l=>l.revId===r.id);
+    const sh=sheet(`<h2>${esc(r.aisleName)}</h2><div class="sub">${esc(r.userName)} · ${fdt(r.start)}${r.end?' a '+fdt(r.end):''}</div><div class="sec">Fechas cortas cargadas (${ls.length})</div>${ls.map(l=>lotRow(l,false)).join('')||'<div class="empty">Ninguna</div>'}
+     ${r.open&&r.userId===ME.id?'<button class="btn pri big" id="hq">📷 Seguir revisando</button>':''}`);const b=sh.querySelector('#hq');if(b)b.onclick=()=>{sh.remove();QREV=r;qScanUI();};});}
+function codeIn(c){if(MODE==='cal'&&QREV&&VIEW==='qscan')qCode(c);else scanCode(c);}
 function vHome(){const A=S.aisles().filter(a=>a.active!==false);const L=latestByClass(7);
   const rev=new Set([...L.values()].map(r=>r.aisleId)).size;const pend=pending(7);
   const today=new Date().toLocaleDateString('es-PE',{weekday:'long',day:'numeric',month:'long'});
@@ -513,14 +626,14 @@ function vib(p){try{navigator.vibrate&&navigator.vibrate(p);}catch(e){}}
 let actx;function beep(f){try{actx=actx||new AudioContext();const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=f;g.gain.value=.08;o.connect(g).connect(actx.destination);o.start();o.stop(actx.currentTime+(f<500?.25:.09));}catch(e){}}
 /* cámara */
 let stream=null,camRun=false,zx=null,lastC='',lastT=0;
-function fsInfo(msg,cls){if(!REC)return;$('#fsA').textContent=REC.aisleName;$('#fsC').textContent=REC.cls?'Solo la clase: '+REC.cls:(REC.aisleDesc||'Todo el pasillo');
-  const n=Object.keys(REC.scans).length,pl=planOf({cats:REC.classes}).length;$('#fsN').textContent=`${n} escaneados de ${fmt(pl)} en el plan`;
+function fsInfo(msg,cls){const Q=MODE==='cal'&&QREV&&VIEW==='qscan';if(!REC&&!Q)return;const X=Q?QREV:REC;$('#fsA').textContent=(Q?'🧪 ':'')+X.aisleName;$('#fsC').textContent=X.cls?'Solo la clase: '+X.cls:(X.aisleDesc||'Todo el pasillo');
+  if(Q)$('#fsN').textContent=Object.keys(QREV.seen).length+' revisados · pistolea un producto para cargar su fecha';else{const n=Object.keys(REC.scans).length,pl=planOf({cats:REC.classes}).length;$('#fsN').textContent=`${n} escaneados de ${fmt(pl)} en el plan`;}
   if(msg){const e=$('#fsL');e.textContent=msg;e.style.background=cls==='err'?'rgba(220,38,38,.9)':cls==='ok'?'rgba(22,163,74,.85)':cls==='info'?'rgba(37,99,235,.85)':'rgba(0,0,0,.55)';}}
-function fsClose(){camOff();$('#fs').classList.add('hide');if(REC&&VIEW==='scan'&&$('#pres'))renderPres();}
-$('#fsX').onclick=fsClose;$('#fsList').onclick=fsClose;$('#fsFin').onclick=()=>{$('#fs').classList.add('hide');finish();};
+function fsClose(){camOff();$('#fs').classList.add('hide');if(MODE==='cal'&&QREV&&VIEW==='qscan'){qScanUI();return;}if(REC&&VIEW==='scan'&&$('#pres'))renderPres();}
+$('#fsX').onclick=fsClose;$('#fsList').onclick=fsClose;$('#fsFin').onclick=()=>{$('#fs').classList.add('hide');if(MODE==='cal'&&QREV&&VIEW==='qscan')qFinish();else finish();};
 $('#fsMan').onclick=()=>{$('#fsManW').classList.remove('hide');$('#fsIn').focus();};
-$('#fsAdd').onclick=()=>{scanCode($('#fsIn').value);$('#fsIn').value='';$('#fsIn').focus();};$('#fsIn').onkeydown=e=>{if(e.key==='Enter')$('#fsAdd').click();};
-async function camOnF(){const ok=c=>{const n=Date.now();if(c===lastC&&n-lastT<3000)return;lastC=c;lastT=n;scanCode(c);};
+$('#fsAdd').onclick=()=>{codeIn($('#fsIn').value);$('#fsIn').value='';$('#fsIn').focus();};$('#fsIn').onkeydown=e=>{if(e.key==='Enter')$('#fsAdd').click();};
+async function camOnF(){const ok=c=>{const n=Date.now();if(c===lastC&&n-lastT<3000)return;lastC=c;lastT=n;codeIn(c);};
   $('#fs').classList.remove('hide');$('#fsManW').classList.add('hide');fsInfo('Iniciando cámara…');camRun=true;const cam={set innerHTML(h){fsInfo(h.replace(/<[^>]+>/g,' '),'err');}};
   try{if('BarcodeDetector' in window){const fm=await BarcodeDetector.getSupportedFormats();const det=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','itf'].filter(f=>fm.includes(f))});
       stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}}});const v=$('#vid');v.srcObject=stream;await v.play();fsInfo('Apunta al código de barras del producto');
