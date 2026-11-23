@@ -618,7 +618,7 @@ function vHome(){const A=S.aisles().filter(a=>a.active!==false);const L=latestBy
   const K=todayKpi();const hr=new Date().getHours();
   $('#main').innerHTML=`<div class="hero"><div class="sub" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase">MiGondola · ${esc(HOME_LOCAL)}</div><h1>${hr<12?'Buenos días':hr<19?'Buenas tardes':'Buenas noches'}, ${esc(ME.name.split(' ')[0])}</h1><div class="sub" style="text-transform:capitalize">${today}</div></div>
   <div class="kpis"><div class="k"><div class="v">${fmt(K.prod)}</div><div class="l">Productos hoy</div></div><div class="k"><div class="v" style="color:var(--ok)">${K.pct}%</div><div class="l">Avance del día</div></div><div class="k"><div class="v" style="color:${K.late?'#b91c1c':'var(--ok)'}">${K.late}</div><div class="l">Atrasadas</div></div></div>${profBanner()}${todayCard(1)}
-  ${open.length?`<div class="sec">Recorridas abiertas (${open.length})</div><div class="card" style="border:1px solid var(--amb);padding:4px 14px">${open.map(r=>`<div class="act" data-cont="${r.id}"><div class="ic y">📷</div><div class="grow"><div class="t">${esc(r.aisleName.replace(/ - .*/,''))}${r.cls?' · '+esc(recLbl(r)):''}</div><div class="s">${Object.keys(r.scans).length} escaneados · desde ${fdt(r.start)}</div></div><button class="btn pri sm" style="flex:none">Seguir</button></div>`).join('')}</div>`:''}
+  ${open.length?`<div class="sec">Recorridas abiertas (${open.length})</div><div class="card" style="border:1px solid var(--amb);padding:4px 14px">${open.map(r=>`<div class="act" data-cont="${r.id}"><div class="ic y">📷</div><div class="grow"><div class="t">${esc(r.aisleName.replace(/ - .*/,''))}${r.cls?' · '+esc(recLbl(r)):''}</div><div class="s">${r.fin?'<b style="color:#c2410c">📤 Falta enviar por WhatsApp</b> · ':''}${Object.keys(r.scans).length} escaneados · desde ${fdt(r.start)}</div></div><button class="btn pri sm" style="flex:none">${r.fin?'Enviar':'Seguir'}</button></div>`).join('')}</div>`:''}
   <div class="sec">Reposición pendiente ${pend.length?'<a id="hCsv">⇣ CSV</a>':''}</div>
   <div class="card">${pend.length?[...byA].sort((a,b)=>b[1]-a[1]).map(([n,c])=>`<div class="act" data-pa="${esc(n)}"><div class="ic o">📦</div><div class="grow"><div class="t">${esc(n)}</div><div class="s">${c} producto(s) con stock en almacén para subir a góndola</div></div><div class="ch">›</div></div>`).join(''):'<div class="empty">Sin reposición pendiente. Escanea un pasillo para ver qué falta exhibir.</div>'}</div>
   <div class="card">${act('🧮','g','Sanear stock','Ver stock del sistema y anotar el conteo físico','hSan')}${act('📝','b','Ajustes de stock',(AJ.all().filter(a=>!a.done).length||'Sin')+' conteo(s) físico(s) pendiente(s) · exportar para ajustar','aAdj')}</div>`;
@@ -715,14 +715,14 @@ function assign(id){const L=S.aisles();const a=L.find(x=>x.id===id);const sel=ne
 /* ================= ESCANEAR ================= */
 let REC=null;
 function vScan(o={}){
-  if(o.rec){REC=S.recs().find(r=>r.id===o.rec);if(REC){REC.open=true;REC.end=null;saveRec();return scanUI();}}
+  if(o.rec){REC=S.recs().find(r=>r.id===o.rec);if(REC){if(REC.fin&&REC.open&&!o.cont)return result(REC);REC.open=true;REC.end=null;delete REC.fin;saveRec();return scanUI();}}
   const OPN=S.recs().filter(r=>r.open&&r.userId===ME.id);const open=OPN[0];
   const A0=S.aisles().filter(a=>a.active!==false);const my=new Set(ME.aisles||[]);const A=my.size?A0.filter(a=>my.has(a.id)):A0;const AO=my.size?A0.filter(a=>!my.has(a.id)):[];
   if(o.aisle&&o.plan)return planRec(o.aisle,o.plan);if(o.aisle)return chooseScope(o.aisle);const aRow=a=>`<div class="act" data-a="${a.id}"><div class="ic y">🗂️</div><div class="grow"><div class="t">${esc(a.name)}</div><div class="s">${esc(a.desc||'')}${a.desc?' · ':''}${fmt(planOf(a).length)} productos en el plan</div></div><div class="ch">›</div></div>`;
   $('#main').innerHTML=`${profBanner()}<h1 style="font-size:22px">¿Qué pasillo vas a revisar?</h1><div class="sub">Escanea cada producto que esté exhibido. Lo que tenga stock y no escanees, sale como "en almacén: a reponer".</div>
-  ${OPN.length?`<div class="sec">Recorridas abiertas (${OPN.length})</div><div class="card" style="border:1px solid var(--amb);padding:4px 14px">${OPN.map(r=>`<div class="act" data-cont="${r.id}"><div class="ic y">📷</div><div class="grow"><div class="t">${esc(r.aisleName.replace(/ - .*/,''))}${r.cls?' · '+esc(recLbl(r)):''}</div><div class="s">${Object.keys(r.scans).length} escaneados · desde ${fdt(r.start)}</div></div><button class="btn pri sm" style="flex:none">Seguir</button></div>`).join('')}</div>`:''}
+  ${OPN.length?`<div class="sec">Recorridas abiertas (${OPN.length})</div><div class="card" style="border:1px solid var(--amb);padding:4px 14px">${OPN.map(r=>`<div class="act" data-cont="${r.id}"><div class="ic y">📷</div><div class="grow"><div class="t">${esc(r.aisleName.replace(/ - .*/,''))}${r.cls?' · '+esc(recLbl(r)):''}</div><div class="s">${r.fin?'<b style="color:#c2410c">📤 Falta enviar por WhatsApp</b> · ':''}${Object.keys(r.scans).length} escaneados · desde ${fdt(r.start)}</div></div><button class="btn pri sm" style="flex:none">${r.fin?'Enviar':'Seguir'}</button></div>`).join('')}</div>`:''}
   ${my.size?'<div class="sec">Tus pasillos</div>':''}<div class="card">${A.map(aRow).join('')||`<div class="empty">No hay pasillos activos.${isAdmin()?' Créalos en la pestaña Pasillos.':' Pide a tu administrador que los cree.'}</div>`}</div>${AO.length?`<details class="card"><summary><b>Otros pasillos (${AO.length})</b></summary>${AO.map(aRow).join('')}</details>`:''}`;
-  $$('[data-cont]').forEach(e=>e.onclick=()=>{REC=OPN.find(r=>r.id===e.dataset.cont);scanUI();});
+  $$('[data-cont]').forEach(e=>e.onclick=()=>{REC=OPN.find(r=>r.id===e.dataset.cont);if(REC.fin)result(REC);else scanUI();});
   $$('[data-a]').forEach(e=>e.onclick=()=>chooseScope(e.dataset.a));}
 function chooseScope(aid){const a=S.aisles().find(x=>x.id===aid);if(!a){go('scan');return;}
   const cls=srt(a.cats).filter(c=>CLS_CNT.get(c));const isNF=cls.some(c=>/^J(0[3-7]|08|09|10|11)/.test(CLS_DIV.get(c)||''));const subs=new Map();for(const c of cls){const s=CLS_SUB.get(c)||'Otros';if(!subs.has(s))subs.set(s,[]);subs.get(s).push(c);}
@@ -807,16 +807,18 @@ function camOff(){camRun=false;try{$('#vid').srcObject=null;}catch(e){}try{zx&&z
 function computeFalt(r){const plan=planOf({cats:r.classes});const falt=[];let pres=0;
   for(const x of plan){if(r.scans[x.sku]){pres++;continue;}falt.push({s:x.sku,d:x.desc,c:x.cla,oh:x.oh,v:+x.vel.toFixed(2)});}
   falt.sort((a,b)=>a.c.localeCompare(b.c)||b.v-a.v);return {falt,pres,plan:plan.length};}
-function finish(){camOff();const r=REC;Object.assign(r,computeFalt(r));r.end=Date.now();r.open=false;saveRec();result(r);}
+function finish(){camOff();const r=REC;Object.assign(r,computeFalt(r));r.fin=Date.now();r.end=null;r.open=true;saveRec();result(r);}
+function closeRec(r){const R=S.recs();const x=R.find(z=>z.id===r.id)||r;Object.assign(x,computeFalt(x));x.open=false;x.end=Date.now();x.sent=x.end;delete x.fin;S.setRecs(R);if(REC&&REC.id===x.id)REC=x;return x;}
 function result(r){const alm=r.falt.filter(f=>f.oh>0),sin=r.falt.filter(f=>f.oh<=0),pnd=pendOf(r);const scn=Object.keys(r.scans).length;
-  $('#main').innerHTML=`<div class="row" style="margin-bottom:8px"><button class="btn sm" id="rBack">‹ Volver a pasillos</button><div class="grow"></div>${isAdmin()?'<button class="btn sm" id="rDel" style="color:var(--red)">🗑 Descartar recorrida</button>':''}</div><div class="card" style="background:#f0fdf4">✅ Recorrida de <b>${esc(r.aisleName)}</b>${r.cls?' (solo '+scopeTxt(r)+' '+esc(recLbl(r))+')':''} finalizada.<br>Se detectaron <b>${r.falt.length}</b> producto(s) que faltan exhibir: <b style="color:#e11d48">${alm.length} con stock en almacén (¡a reponer!)</b> y ${sin.length} sin stock.${alm.length-pnd.length?'<br>✓ '+(alm.length-pnd.length)+' ya repuesto(s).':''}</div>
+  $('#main').innerHTML=`<div class="row" style="margin-bottom:8px"><button class="btn sm" id="rBack">‹ Volver a pasillos</button><div class="grow"></div>${isAdmin()?'<button class="btn sm" id="rDel" style="color:var(--red)">🗑 Descartar recorrida</button>':''}</div>${r.open?`<div class="card" style="background:#fff7ed;border:1px solid #fdba74"><b style="color:#9a3412">📤 Falta enviar por WhatsApp</b><div style="font-size:13.5px;margin-top:4px">La recorrida se finaliza recién cuando envías el reporte. Mientras tanto sigue en proceso y no cuenta en Avance.</div><button class="btn pri big" id="rSend" style="width:100%;margin-top:10px;background:#16a34a;border-color:#16a34a">📤 Enviar por WhatsApp y finalizar</button></div>`:''}<div class="card" style="background:#f0fdf4">${r.open?'📋':'✅'} Recorrida de <b>${esc(r.aisleName)}</b>${r.cls?' (solo '+scopeTxt(r)+' '+esc(recLbl(r))+')':''} ${r.open?'revisada (por enviar)':'finalizada'}.<br>Se detectaron <b>${r.falt.length}</b> producto(s) que faltan exhibir: <b style="color:#e11d48">${alm.length} con stock en almacén (¡a reponer!)</b> y ${sin.length} sin stock.${alm.length-pnd.length?'<br>✓ '+(alm.length-pnd.length)+' ya repuesto(s).':''}</div>
   <div class="kp3"><div class="kpi"><div class="v">${scn}</div><div class="l">presentes</div></div><div class="kpi"><div class="v" style="color:#e11d48">${pnd.length}</div><div class="l">por reponer</div></div><div class="kpi"><div class="v" style="color:var(--ora)">${sin.length}</div><div class="l">sin stock</div></div></div>
   <div class="sec">Faltantes — hay que reponer (primero lo que más vende) <a id="rCsv">⇣ CSV</a></div><div class="sub" style="margin:-4px 2px 6px">Cuando lo repongas, toca ✓ Repuesto.</div>${faltList(alm,r)}
   ${sin.length?`<details class="card"><summary><b>Sin stock en almacén (${sin.length})</b> <span class="sub">no están en góndola y el sistema tampoco tiene stock: pedir reposición</span></summary>${faltList(sin)}</details>`:''}
   ${rejList(r)}
-  <div class="row" style="flex-wrap:wrap;margin-top:12px"><button class="btn pri" id="rCont">📷 Seguir escaneando</button><button class="btn pri" id="rOther">Escanear otro pasillo</button><button class="btn" id="rHist">Ver historial</button><button class="btn" id="rShare">📤 WhatsApp</button></div>`;
-  $('#rCont').onclick=()=>go('scan',{rec:r.id});$('#rOther').onclick=()=>{REC=null;go('scan');};$('#rHist').onclick=()=>go('hist');
-  $('#rCsv').onclick=()=>csvRec(r);$('#rShare').onclick=()=>shareRec(r);
+  <div class="row" style="flex-wrap:wrap;margin-top:12px"><button class="btn pri" id="rCont">📷 Seguir escaneando</button><button class="btn pri" id="rOther">Escanear otro pasillo</button><button class="btn" id="rHist">Ver historial</button>${r.open?'':'<button class="btn" id="rShare">📤 Reenviar por WhatsApp</button>'}</div>`;
+  $('#rCont').onclick=()=>go('scan',{rec:r.id,cont:1});$('#rOther').onclick=()=>{REC=null;go('scan');};$('#rHist').onclick=()=>go('hist');
+  $('#rCsv').onclick=()=>csvRec(r);if($('#rShare'))$('#rShare').onclick=()=>shareRec(r);
+  if($('#rSend'))$('#rSend').onclick=async()=>{const ok=await shareRec(r);if(!ok)return;const x=closeRec(r);toast('✅ Recorrida enviada y finalizada','ok');result(x);};
   $('#rBack').onclick=()=>{REC=null;go('scan');};
   if($('#rDel'))$('#rDel').onclick=()=>{if(!confirm('¿Descartar esta recorrida? No quedará en el historial.'))return;S.setRecs(S.recs().filter(x=>x.id!==r.id));REC=null;toast('Recorrida descartada');go('scan');};}
 function rejList(r){const L=(r.rej||[]).map(s=>PR[BYSKU.get(s)]).filter(Boolean);if(!L.length)return '';
@@ -831,14 +833,15 @@ function csvRec(r){csvDownload(`recorrida_${r.aisleName.replace(/\W+/g,'_')}_${n
   ...r.falt.map(f=>{const x=PR[BYSKU.get(f.s)]||{};return [r.aisleName,r.cls||'Todo el pasillo',r.userName,fdt(r.start),r.end?fdt(r.end):'',f.oh>0?'En almacen - reponer':'Sin stock',f.c,f.s,x.gtin||'',f.d,f.oh];}),
   ...Object.keys(r.scans).map(k=>{const x=PR[BYSKU.get(k)]||{};return [r.aisleName,r.cls||'Todo el pasillo',r.userName,fdt(r.start),r.end?fdt(r.end):'','Presente',x.cla||'',k,x.gtin||'',x.desc||'',x.oh??''];})]);}
 function waLine(sku,desc,oh){const x=PR[BYSKU.get(String(sku))]||{};return `• ${x.marca?x.marca+' · ':''}${x.desc||desc||''}\n   GTIN ${x.gtin||'-'} · SKU ${sku} · OH ${oh===''||oh==null?'-':fmt(oh)}`;}
-async function shareRec(r){const alm=r.falt.filter(f=>f.oh>0),pnd=sortFalt(pendOf(r));let cur=null,t=`🛒 Recorrida ${r.aisleName}${r.cls?' ('+recLbl(r)+')':''} – ${r.userName} – ${fdt(r.end||Date.now())}\nPresentes: ${Object.keys(r.scans).length} · A reponer: ${pnd.length}${alm.length-pnd.length?' · Ya repuestos: '+(alm.length-pnd.length):''}\n`;
-  for(const f of pnd){if(f.c!==cur){cur=f.c;t+=`\n*${short(cur)}*\n`;}t+=waLine(f.s,f.d,f.oh)+'\n';}
-  const rj=(r.rej||[]).map(s=>PR[BYSKU.get(s)]).filter(Boolean);
-  if(rj.length){t+=`\n📍 *Mal ubicados (${rj.length}): llevar a su pasillo*\n`;for(const x of rj){const w=aisleOfClass(x.cla).map(a=>a.name).join(', ');t+=waLine(x.sku,x.desc,x.oh)+`\n   Va en: ${w||short(x.cla)}\n`;}}
+async function shareRec(r){const pnd=sortFalt(pendOf(r));let cur=null;
+  let t=`🛒 *${r.aisleName.replace(/ - .*/,'')}*${r.cls?' · '+recLbl(r):''} — ${r.userName.split(' ')[0]} ${fdt(Date.now())}\n`;
+  t+=`\n*Faltantes por reponer (${pnd.length})*\n`;if(!pnd.length)t+='Sin faltantes ✓\n';
+  for(const f of pnd){if(f.c!==cur){cur=f.c;t+=`\n_${short(cur)}_\n`;}t+=waLine(f.s,f.d,f.oh)+'\n';}
   const aj=AJ.all().filter(a=>!a.done&&r.classes.includes(a.cla));
-  if(aj.length){t+=`\n📝 *Ajustar stock (${aj.length})*\n`;for(const a of aj){const d=a.fis-a.oh;t+=waLine(a.sku,a.desc,a.oh)+`\n   Físico ${fmt(a.fis)} · Sistema ${fmt(a.oh)} · Ajustar ${d>0?'+':''}${fmt(d)}\n`;}}
-  try{if(navigator.share){await navigator.share({text:t});return;}}catch(e){if(e.name==='AbortError')return;}
-  try{await navigator.clipboard.writeText(t);toast('Lista copiada: pégala en WhatsApp','ok');}catch(e){window.open('https://wa.me/?text='+encodeURIComponent(t));}}
+  if(aj.length){t+=`\n📝 *Ajustes de stock (${aj.length})*\n`;for(const a of aj){const d=a.fis-a.oh;t+=waLine(a.sku,a.desc,a.oh)+`\n   Físico ${fmt(a.fis)} · Sistema ${fmt(a.oh)} · Ajustar ${d>0?'+':''}${fmt(d)}\n`;}}
+  try{if(navigator.share){await navigator.share({text:t});return true;}}catch(e){if(e.name==='AbortError')return false;}
+  try{window.open('https://wa.me/?text='+encodeURIComponent(t));return true;}catch(e){}
+  try{await navigator.clipboard.writeText(t);toast('Lista copiada: pégala en WhatsApp','ok');return true;}catch(e){toast('No se pudo abrir WhatsApp','err');return false;}}
 
 /* ================= PLAN SEMANAL (por clase) ================= */
 const DIAS=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'],DIASL=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
@@ -883,7 +886,7 @@ function recLbl(r){if(!r||!r.cls)return '';const C=r.classes||[];if(r.grp!=='pla
   const D=S.length>2?[...new Set(C.map(c=>{const x=PR.find(y=>y.cla===c);return x?short(x.dep):'';}).filter(Boolean))]:[];
   return (S.length&&S.length<=2?S.map(lc).join(' y '):D.length&&D.length<=2?D.map(lc).join(' y '):short(C[0])+', '+short(C[1])+'…')+' · '+C.length+' clases';}
 function planRec(aid,cls){const a=S.aisles().find(x=>x.id===aid);if(!a)return chooseScope(aid);cls=cls.filter(c=>a.cats.includes(c));if(!cls.length)return chooseScope(aid);
-  const key=[...cls].sort().join('|');const op=S.recs().find(r=>r.open&&r.userId===ME.id&&r.aisleId===aid&&[...r.classes].sort().join('|')===key);if(op){REC=op;return scanUI();}
+  const key=[...cls].sort().join('|');const op=S.recs().find(r=>r.open&&r.userId===ME.id&&r.aisleId===aid&&[...r.classes].sort().join('|')===key);if(op){REC=op;if(op.fin)return result(op);return scanUI();}
   const subs=[...new Set(cls.map(c=>CLS_SUB.get(c)||''))];const full=subs.length===1&&subs[0]&&a.cats.filter(c=>CLS_CNT.get(c)&&CLS_SUB.get(c)===subs[0]).every(c=>cls.includes(c));
   const one=cls.length===1;const lbl=one?cls[0]:full&&cls.length>1?subs[0]:cls.map(short).join(', ');
   REC={id:uid(),aisleId:a.id,aisleName:a.name,aisleDesc:a.desc||'',cls:lbl,grp:one?undefined:full?'sub':'plan',classes:[...cls],rep:{},userId:ME.id,userName:ME.name,start:Date.now(),end:null,open:true,scans:{},rej:[],falt:[],pres:0,plan:0,upd:Date.now()};
