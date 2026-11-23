@@ -216,6 +216,11 @@ details.tm[open]>summary .chv{transform:rotate(90deg)}.chv{color:#cbd5e1;transit
   <button data-q="qalert"><b>⚠️</b>Alertas</button>
   <button data-q="qhist"><b>🕘</b>Historial</button>
 </nav>
+<nav id="navD" class="hide">
+  <button data-d="dhome"><b>🏠</b>Inicio</button>
+  <button data-d="dscan"><b>🎁</b>Solicitud</button>
+  <button data-d="dhist"><b>🕘</b>Historial</button>
+</nav>
 <input type="file" id="fileRep" multiple class="hide">
 <input type="file" id="fileBk" accept=".json,.txt" class="hide">
 
@@ -367,12 +372,12 @@ async function syncNow(){const url=syncUrl();if(!url||SYNCING)return;SYNCING=tru
     if(Object.keys(LS.get('dirty',{})).length)setTimeout(syncNow,500);
   }catch(e){SYNC_ERR='Sin conexión con la hoja: '+e.message;}finally{SYNCING=false;syncBadge();}}
 function applyRemote(items){const st=items.filter(x=>x.k==='d'&&x.id==='stock').sort((a,b)=>b.upd-a.upd)[0];if(st)applyStock(st);const D=LS.get('dirty',{});let ch=false;APPLYING=true;
-  try{const GS={u:[S.users,S.setUsers],a:[S.aisles,S.setAisles],r:[S.recs,S.setRecs],l:[QS.lots,QS.setLots],q:[QS.revs,QS.setRevs],g:[()=>LS.get('qcfg',[]),x=>LS.set('qcfg',x)],j:[AJ.all,AJ.set],x:[XS.all,XS.set]};for(const k of['u','a','r','l','q','g','j','x']){const[get,set]=GS[k];const L=get();const m=new Map(L.map(x=>[x.id,x]));let c=false;
+  try{const GS={u:[S.users,S.setUsers],a:[S.aisles,S.setAisles],r:[S.recs,S.setRecs],l:[QS.lots,QS.setLots],q:[QS.revs,QS.setRevs],g:[()=>LS.get('qcfg',[]),x=>LS.set('qcfg',x)],j:[AJ.all,AJ.set],x:[XS.all,XS.set],n:[()=>DN.all(),x=>DN.set(x)]};for(const k of['u','a','r','l','q','g','j','x','n']){const[get,set]=GS[k];const L=get();const m=new Map(L.map(x=>[x.id,x]));let c=false;
       for(const it of items){if(it.k!==k||D[k+'|'+it.id])continue;const cur=m.get(it.id);
         if(it.del){if(cur&&(cur.upd||0)<=it.upd){m.delete(it.id);c=true;}}else if(!cur||(cur.upd||0)<it.upd){m.set(it.id,it.d);c=true;}}
-      if(c){let out=[...m.values()];if(k==='r'||k==='q')out.sort((a,b)=>b.start-a.start);if(k==='l')out.sort((a,b)=>b.created-a.created);if(k==='j'||k==='x')out.sort((a,b)=>b.ts-a.ts);set(out);ch=true;}}}finally{APPLYING=false;}
+      if(c){let out=[...m.values()];if(k==='r'||k==='q')out.sort((a,b)=>b.start-a.start);if(k==='l')out.sort((a,b)=>b.created-a.created);if(k==='j'||k==='x')out.sort((a,b)=>b.ts-a.ts);if(k==='n')out.sort((a,b)=>b.created-a.created);set(out);ch=true;}}}finally{APPLYING=false;}
   if(ch){if(ME){const u=S.users().find(x=>x.id===ME.id);if(u)ME=u;}if(REC){const r=S.recs().find(x=>x.id===REC.id);if(r&&!(VIEW==='scan'&&REC.open))REC=r;}
-    if(ME&&!$('#fs').classList.contains('hide'))return;if(QREV&&QREV.open){const q=QS.revs().find(x=>x.id===QREV.id);if(q)QREV=q;}if(ME&&['home','hist','av','rep','qhome','qalert','qhist'].includes(VIEW)&&!document.querySelector('.sheet'))go(VIEW);if(!ME)showLogin();}}
+    if(ME&&!$('#fs').classList.contains('hide'))return;if(QREV&&QREV.open){const q=QS.revs().find(x=>x.id===QREV.id);if(q)QREV=q;}if(ME&&['home','hist','av','rep','qhome','qalert','qhist','dhome','dhist'].includes(VIEW)&&!document.querySelector('.sheet'))go(VIEW);if(!ME)showLogin();}}
 if('serviceWorker' in navigator&&isSecureContext&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});setInterval(syncNow,25000);
 function cleanup(){try{if(!ME||!isAdmin()||LS.get('cleanDay','')===dayStr(Date.now()))return;LS.set('cleanDay',dayStr(Date.now()));const lim=Date.now()-60*864e5;
   const R=S.recs(),R2=R.filter(r=>r.open||(r.end||r.start)>=lim);if(R2.length<R.length)S.setRecs(R2);
@@ -413,14 +418,14 @@ function aisleOfClass(c){return S.aisles().filter(a=>a.active!==false&&a.cats.in
 /* ================= navegación ================= */
 let VIEW='home';
 const NAVOF={hist:'av',prod:'more',ais:'more',users:'more',san:'more'};
-const TITLES={more:'Más',qhome:'Calidad',qscan:'Revisar fechas',qalert:'Alertas de retiro',qhist:'Historial calidad',mode:'MiGondola',home:'Inicio',scan:'Escanear',hist:'Historial',av:'Avance',rep:'Reportes',prod:'Productos',ais:'Pasillos',users:'Usuarios'};
+const TITLES={more:'Más',qhome:'Calidad',qscan:'Revisar fechas',qalert:'Alertas de retiro',qhist:'Historial calidad',dhome:'Donaciones',dscan:'Solicitud de donación',dhist:'Historial donaciones',mode:'MiGondola',home:'Inicio',scan:'Escanear',hist:'Historial',av:'Avance',rep:'Reportes',prod:'Productos',ais:'Pasillos',users:'Usuarios'};
 let HSTK=[],GARGS=[],GBACK=false;
-function goBack(){if(VIEW==='scan'&&!REC&&!/¿Qué pasillo/.test($('#main').textContent)||VIEW==='scan'&&REC&&!REC.open){REC=null;GBACK=true;go('scan');GBACK=false;return;}const h=HSTK.pop();GBACK=true;if(h)go(h[0],...h[1]);else go(MODE==='cal'?'qhome':'home');GBACK=false;}
-function go(v,...args){{const AD=!!(ME&&isAdmin());const nb=document.querySelector('#nav [data-v="av"]');if(nb)nb.style.display=AD?'':'none';const nr=document.querySelector('#nav [data-v="rep"]');if(nr)nr.style.display=AD?'':'none';const nh=document.querySelector('#nav [data-v="hist"]');if(nh)nh.style.display=AD?'none':'';if(v==='av'&&!(ME&&isAdmin()))v='home';}if(!GBACK&&VIEW&&!(VIEW===v&&!args.length&&!GARGS.length)&&VIEW!=='mode'){HSTK.push([VIEW,GARGS]);if(HSTK.length>30)HSTK.shift();}if(v==='mode')HSTK=[];GARGS=args.filter(a=>typeof a!=='object'||(a&&!a.rec&&!a.aisle));if((VIEW==='scan'||VIEW==='qscan')&&v!==VIEW)camOff();$$('#navQ button').forEach(b=>b.classList.toggle('on',b.dataset.q===v));$('#fs').classList.add('hide');$('#toasts').innerHTML='';VIEW=v;const _ad=!!(ME&&isAdmin());const nv=!_ad&&v==='hist'?'hist':!_ad&&v==='rep'?'more':NAVOF[v]||v;$$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===nv));
-  $('#hBack').classList.toggle('hide',['home','qhome','mode'].includes(v));$('#crumb').textContent=TITLES[v]||'MiGondola';document.title='MiGondola — '+(TITLES[v]||'');window.scrollTo(0,0);
-  ({mode:vMode,qhome:vQHome,qscan:vQScan,qalert:vQAlert,qhist:vQHist,home:vHome,scan:vScan,hist:vHist,av:vAv,rep:vRep,prod:vProd,san:vSan,ais:vAis,users:vUsers,more:vMore})[v](...args);}
+function goBack(){if(VIEW==='scan'&&!REC&&!/¿Qué pasillo/.test($('#main').textContent)||VIEW==='scan'&&REC&&!REC.open){REC=null;GBACK=true;go('scan');GBACK=false;return;}const h=HSTK.pop();GBACK=true;if(h)go(h[0],...h[1]);else go(MODE==='cal'?'qhome':MODE==='don'?'dhome':'home');GBACK=false;}
+function go(v,...args){{const AD=!!(ME&&isAdmin());const nb=document.querySelector('#nav [data-v="av"]');if(nb)nb.style.display=AD?'':'none';const nr=document.querySelector('#nav [data-v="rep"]');if(nr)nr.style.display=AD?'':'none';const nh=document.querySelector('#nav [data-v="hist"]');if(nh)nh.style.display=AD?'none':'';if(v==='av'&&!(ME&&isAdmin()))v='home';}if(!GBACK&&VIEW&&!(VIEW===v&&!args.length&&!GARGS.length)&&VIEW!=='mode'){HSTK.push([VIEW,GARGS]);if(HSTK.length>30)HSTK.shift();}if(v==='mode')HSTK=[];GARGS=args.filter(a=>typeof a!=='object'||(a&&!a.rec&&!a.aisle));if((VIEW==='scan'||VIEW==='qscan')&&v!==VIEW)camOff();$$('#navQ button').forEach(b=>b.classList.toggle('on',b.dataset.q===v));$$('#navD button').forEach(b=>b.classList.toggle('on',b.dataset.d===v));$('#fs').classList.add('hide');$('#toasts').innerHTML='';VIEW=v;const _ad=!!(ME&&isAdmin());const nv=!_ad&&v==='hist'?'hist':!_ad&&v==='rep'?'more':NAVOF[v]||v;$$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===nv));
+  $('#hBack').classList.toggle('hide',['home','qhome','dhome','mode'].includes(v));$('#crumb').textContent=TITLES[v]||'MiGondola';document.title='MiGondola — '+(TITLES[v]||'');window.scrollTo(0,0);
+  ({dhome:vDHome,dscan:vDScan,dhist:vDHist,mode:vMode,qhome:vQHome,qscan:vQScan,qalert:vQAlert,qhist:vQHist,home:vHome,scan:vScan,hist:vHist,av:vAv,rep:vRep,prod:vProd,san:vSan,ais:vAis,users:vUsers,more:vMore})[v](...args);}
 document.addEventListener('click',e=>{if(e.target.closest('#avHist'))go('hist');});
-$$('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));$$('#navQ button').forEach(b=>b.onclick=()=>{if(b.dataset.q==='qscan'&&QREV&&QREV.open){qScanUI();return;}go(b.dataset.q);});$('#hMode').onclick=()=>{camOff();go('mode');};$('#hBack').onclick=()=>{camOff();goBack();};
+$$('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));$$('#navQ button').forEach(b=>b.onclick=()=>{if(b.dataset.q==='qscan'&&QREV&&QREV.open){qScanUI();return;}go(b.dataset.q);});$$('#navD button').forEach(b=>b.onclick=()=>go(b.dataset.d));$('#hMode').onclick=()=>{camOff();go('mode');};$('#hBack').onclick=()=>{camOff();goBack();};
 $('#hOut').onclick=()=>{camOff();$('#fs').classList.add('hide');ME=null;LS.set('me',null);showLogin();};
 function act(ic,cls,t,s,id,red){return `<div class="act" id="${id}"><div class="ic ${cls}">${ic}</div><div class="grow"><div class="t ${red?'red':''}">${t}</div>${s?`<div class="s">${s}</div>`:''}</div><div class="ch">›</div></div>`;}
 function sheet(html){const e=document.createElement('div');e.className='sheet';e.innerHTML=`<div class="in"><button class="x">✕</button>${html}</div>`;document.body.appendChild(e);
@@ -478,11 +483,11 @@ const daysTo=fv=>{const [y,m,d]=fv.split('-').map(Number);const t=new Date();t.s
 const fdate=fv=>{const [y,m,d]=fv.split('-');return d+'/'+m+'/'+y;};
 function lotState(l){const c=QS.cfg(),n=daysTo(l.fv);if(l.status==='retirado')return 'ret';if(n<0)return 'venc';if(n<=c.ant)return 'retirar';if(n<=c.ant+c.prox)return 'prox';return 'ok';}
 function qCounts(){const L=QS.lots().filter(l=>l.status!=='retirado');const o={venc:0,retirar:0,prox:0,ok:0};for(const l of L)o[lotState(l)]++;o.now=o.venc+o.retirar;o.act=L.length;return o;}
-function setMode(m){MODE=m;LS.set('mode',m);$('#nav').classList.toggle('hide',m!=='osa');$('#navQ').classList.toggle('hide',m!=='cal');$('#hMode').textContent=m==='cal'?'🧪 Calidad ⇄':'📦 Disponib. ⇄';go(m==='cal'?'qhome':'home');}
-function vMode(){$('#nav').classList.add('hide');$('#navQ').classList.add('hide');const q=qCounts();
+function setMode(m){MODE=m;LS.set('mode',m);$('#nav').classList.toggle('hide',m!=='osa');$('#navQ').classList.toggle('hide',m!=='cal');$('#navD').classList.toggle('hide',m!=='don');$('#hMode').textContent=m==='cal'?'🧪 Calidad ⇄':m==='don'?'🎁 Donaciones ⇄':'📦 Disponib. ⇄';go(m==='cal'?'qhome':m==='don'?'dhome':'home');}
+function vMode(){$('#nav').classList.add('hide');$('#navQ').classList.add('hide');$('#navD').classList.add('hide');const dn=DN.all().filter(d=>d.status==='enviada').length;const q=qCounts();
   $('#main').innerHTML=`<h1 style="font-size:22px">Hola, ${esc(ME.name.split(' ')[0])}</h1><div class="sub">¿Qué vas a trabajar?</div>
-  <div class="card" style="margin-top:12px">${act('📦','g','Disponibilidad','Pistolear pasillos: lo no exhibido con stock = reponer','mOsa')}${act('🧪','v','Calidad','Fechas de vencimiento: revisar, cargar fechas cortas y retirar'+(q.now?' · ⚠️ '+q.now+' por retirar':''),'mCal')}</div>`;
-  $('#mOsa').onclick=()=>setMode('osa');$('#mCal').onclick=()=>setMode('cal');}
+  <div class="card" style="margin-top:12px">${act('📦','g','Disponibilidad','Pistolear pasillos: lo no exhibido con stock = reponer','mOsa')}${act('🧪','v','Calidad','Fechas de vencimiento: revisar, cargar fechas cortas y retirar'+(q.now?' · ⚠️ '+q.now+' por retirar':''),'mCal')}${act('🎁','o','Donaciones','Solicitud de entrega de donaciones'+(dn?' · '+dn+' por entregar':''),'mDon')}</div>`;
+  $('#mOsa').onclick=()=>setMode('osa');$('#mCal').onclick=()=>setMode('cal');$('#mDon').onclick=()=>setMode('don');}
 function lotRow(l,btn=true){const n=daysTo(l.fv),st=lotState(l);const col=st==='venc'||st==='retirar'?'#dc2626':st==='prox'?'#ea580c':'#16a34a';
   const txt=st==='ret'?'retirado '+fdt(l.retAt)+' por '+esc(l.retBy||''):n<0?'venció hace '+(-n)+' día(s)':n===0?'vence HOY':'vence en '+n+' día(s)';
   return `<div class="it" data-l="${l.id}"><div class="grow"><div class="d">${esc(l.desc)}</div><div class="c">${idC(PR[BYSKU.get(String(l.sku))]||{gtin:l.gtin},l.sku)} · OH ${(()=>{const x=PR[BYSKU.get(String(l.sku))];return x?fmt(x.oh):'-';})()}</div><div class="c">${fdate(l.fv)} · <b style="color:${col}">${txt}</b>${l.qty?' · '+fmt(l.qty)+' und':''} · ${esc(l.userName||'')}</div></div>${btn&&st!=='ret'?`<button class="btn sm pri" data-ret="${l.id}">Retirado</button>`:''}</div>`;}
@@ -575,7 +580,90 @@ function vQHist(){const R=QS.revs().filter(r=>isAdmin()||r.userId===ME.id).slice
   $$('[data-qh]').forEach(e=>e.onclick=()=>{const r=R.find(x=>x.id===e.dataset.qh);const ls=QS.lots().filter(l=>l.revId===r.id);
     const sh=sheet(`<h2>${esc(r.aisleName)}</h2><div class="sub">${esc(r.userName)} · ${fdt(r.start)}${r.end?' a '+fdt(r.end):''}</div><div class="sec">Fechas cortas cargadas (${ls.length})</div>${ls.map(l=>lotRow(l,false)).join('')||'<div class="empty">Ninguna</div>'}
      ${r.open&&r.userId===ME.id?'<button class="btn pri big" id="hq">📷 Seguir revisando</button>':''}`);const b=sh.querySelector('#hq');if(b)b.onclick=()=>{sh.remove();QREV=r;qScanUI();};});}
-function codeIn(c){if(VIEW==='san')sanCode(String(c).trim());else if(MODE==='cal'&&QREV&&VIEW==='qscan')qCode(c);else scanCode(c);}
+/* ================= módulo DONACIONES ================= */
+const DN={all:()=>LS.get('dons',[]),set:l=>{track('n',DN.all(),l);LS.set('dons',l.slice(0,1500));}};
+const DMOT=['Vencimiento próximo','Empaque dañado','Producto dañado','Mal etiquetado','Otro'];
+const DST={borrador:['En armado','y'],enviada:['Por entregar','o'],entregada:['Entregada','g']};
+function dCur(){return DN.all().find(d=>d.status==='borrador'&&d.userId===ME.id);}
+function dSave(d){d.upd=Date.now();const L=DN.all();const i=L.findIndex(x=>x.id===d.id);if(i>=0)L[i]=d;else L.unshift(d);DN.set(L);}
+function dNew(){const L=DN.all();const num=L.reduce((m,x)=>Math.max(m,x.num||0),0)+1;const d={id:uid(),num,userId:ME.id,userName:ME.name,created:Date.now(),status:'borrador',items:[],nota:'',upd:Date.now()};dSave(d);return d;}
+const dUnd=d=>d.items.reduce((s,i)=>s+(+i.qty||0),0);
+function dText(d){return '*🎁 Solicitud de donación N° '+d.num+'* — '+HOME_LOCAL+'\n'+esc0(d.userName)+' · '+fdt(d.sentAt||Date.now())+'\n'+d.items.length+' producto(s) · '+fmt(dUnd(d))+' unidad(es)\n\n'+d.items.map(i=>{const x=PR[BYSKU.get(String(i.sku))];return waLine(i.sku,i.desc,x?x.oh:'')+'\n   Cant. '+fmt(i.qty)+' · '+i.mot+(i.fv?' · vence '+fdate(i.fv):'');}).join('\n')+(d.nota?'\n\nNota: '+d.nota:'');}
+const esc0=s=>String(s||'');
+function dCsv(L){const rows=[['N°','Estado','Solicitado por','Fecha envío','Entregada','Entregó','SKU','GTIN','Descripción','Clase','Cantidad','Motivo','Vence']];
+  for(const d of L)for(const i of d.items)rows.push([d.num,DST[d.status][0],d.userName,d.sentAt?fdt(d.sentAt):'',d.delAt?fdt(d.delAt):'',d.delBy||'',i.sku,i.gtin,i.desc,i.cla,i.qty,i.mot,i.fv?fdate(i.fv):'']);
+  csvDownload('donaciones_'+dayStr(Date.now())+'.csv',rows);}
+function dRow(d){const s=DST[d.status];return `<div class="act" data-dn="${d.id}"><div class="ic ${s[1]}">🎁</div><div class="grow"><div class="t">Solicitud N° ${d.num} · <span style="color:${d.status==='entregada'?'var(--g)':d.status==='enviada'?'var(--ora)':'var(--amb)'}">${s[0]}</span></div><div class="s">${esc(d.userName)} · ${fdt(d.sentAt||d.created)} · ${d.items.length} producto(s) · ${fmt(dUnd(d))} und</div></div><div class="ch">›</div></div>`;}
+function bindDn(L,after){$$('[data-dn]').forEach(e=>e.onclick=()=>dSheet(e.dataset.dn,after));}
+function vDHome(){const L=DN.all();const cur=dCur();const mes=dayStr(Date.now()).slice(0,7);const AD=isAdmin();
+  const pend=L.filter(d=>d.status==='enviada'),entM=L.filter(d=>d.status==='entregada'&&dayStr(d.delAt).slice(0,7)===mes);
+  const mine=L.filter(d=>d.status!=='borrador'&&(AD||d.userId===ME.id)).slice(0,8);
+  $('#main').innerHTML=`<h1 style="font-size:22px">Donaciones</h1><div class="sub">Solicitud de entrega de donaciones: pistolea lo que sale para donar, pon cantidad y motivo, y envía la solicitud.</div>
+  <div class="kp3" style="margin-top:10px"><div class="kpi"><div class="v" style="color:var(--ora)">${pend.length}</div><div class="l">por entregar</div></div><div class="kpi"><div class="v" style="color:var(--g)">${entM.length}</div><div class="l">entregadas este mes</div></div><div class="kpi"><div class="v">${fmt(entM.reduce((s,d)=>s+dUnd(d),0))}</div><div class="l">und donadas este mes</div></div></div>
+  ${cur&&cur.items.length?`<div class="card" style="border:1px solid var(--amb)"><b>Solicitud N° ${cur.num} en armado:</b> ${cur.items.length} producto(s) · ${fmt(dUnd(cur))} und<div class="row" style="margin-top:8px"><button class="btn pri sm" id="dCont">Seguir armando</button></div></div>`:''}
+  <button class="btn pri big" id="dGo">🎁 ${cur&&cur.items.length?'Ir a la solicitud':'Nueva solicitud de donación'}</button>
+  ${AD&&pend.length?`<div class="sec">Por entregar</div><div class="card">${pend.map(dRow).join('')}</div>`:''}
+  <div class="sec">Últimas solicitudes</div><div class="card">${mine.filter(d=>!(AD&&d.status==='enviada')).map(dRow).join('')||'<div class="empty">Aún no hay solicitudes</div>'}</div>`;
+  $('#dGo').onclick=()=>go('dscan');const c=$('#dCont');if(c)c.onclick=()=>go('dscan');bindDn(L,vDHome);}
+function dItem(i,k){return `<div class="it"><div class="grow"><div class="d">${esc(i.desc)}</div><div class="c">${idC(PR[BYSKU.get(String(i.sku))]||{gtin:i.gtin},i.sku)} · ${esc(short(i.cla||''))}</div><div class="c"><b>${fmt(i.qty)} und</b> · ${esc(i.mot)}${i.fv?' · vence '+fdate(i.fv):''}</div></div>${k!=null?`<button class="btn sm" data-di="${k}">✎</button>`:''}</div>`;}
+function vDScan(){let d=dCur();VIEW='dscan';$$('#navD button').forEach(b=>b.classList.toggle('on',b.dataset.d==='dscan'));
+  $('#main').innerHTML=`<div class="card" style="padding:10px 14px"><div style="font-weight:600">🎁 Solicitud de donación ${d?'N° '+d.num:'(nueva)'}</div><div class="sub">${esc(ME.name)} · ${fdt(d?d.created:Date.now())}</div></div>
+  <button class="btn pri big" id="dCam" style="padding:18px;font-size:18px">📷 Pistolear producto</button>
+  <div class="row" style="margin:10px 0"><input class="inp grow" id="dMan" placeholder="Código o nombre del producto"><button class="btn pri" id="dAdd">Buscar</button></div><div id="dRes"></div>
+  <div style="margin:6px 2px"><b style="font-size:20px">${d?d.items.length:0}</b> <span class="sub">producto(s) · ${fmt(d?dUnd(d):0)} unidad(es)</span></div>
+  <div class="sec">Productos de la solicitud</div><div class="card" style="padding:6px 10px">${d&&d.items.length?d.items.map((i,k)=>dItem(i,k)).join(''):'<div class="empty">Pistolea o busca los productos a donar</div>'}</div>
+  ${d&&d.items.length?`<label class="f">Nota (opcional)</label><input class="inp" id="dNota" value="${esc(d.nota||'')}" placeholder="Ej.: entregar a la parroquia el viernes">
+  <button class="btn pri big" id="dSend" style="margin-top:10px">📤 Enviar solicitud por WhatsApp</button>
+  <div class="row" style="margin-top:8px"><button class="btn grow" id="dOnly">✓ Ya la envié, solo guardar</button><button class="btn dan grow" id="dDrop">Descartar</button></div>`:''}`;
+  $('#dCam').onclick=camOnF;const find=()=>{const v=$('#dMan').value.trim();if(!v)return;if(/^\d{5,}$/.test(v)){$('#dMan').value='';dCode(v);return;}
+    const w=v.toLowerCase().split(/\s+/);const R=PR.filter(x=>{const s=(x.desc+' '+(x.marca||'')).toLowerCase();return w.every(p=>s.includes(p));}).slice(0,25);
+    $('#dRes').innerHTML=`<div class="card" style="padding:6px 10px">${R.map(x=>`<div class="it" data-ds="${x.sku}" style="cursor:pointer"><div class="grow"><div class="d">${esc(x.desc)}</div><div class="c">${idC(x,x.sku)} · OH ${fmt(x.oh)}</div></div><div class="ch">›</div></div>`).join('')||'<div class="empty">Sin resultados</div>'}</div>`;
+    $$('[data-ds]').forEach(e=>e.onclick=()=>{$('#dRes').innerHTML='';$('#dMan').value='';dCode(e.dataset.ds);});};
+  $('#dAdd').onclick=find;$('#dMan').onkeydown=e=>{if(e.key==='Enter')find();};
+  $$('[data-di]').forEach(b=>b.onclick=()=>dEdit(+b.dataset.di));
+  const nt=$('#dNota');if(nt)nt.onchange=()=>{const x=dCur();x.nota=nt.value.trim();dSave(x);};
+  const close=async share=>{const x=dCur();if(nt)x.nota=nt.value.trim();x.status='enviada';x.sentAt=Date.now();dSave(x);if(share){const ok=await doShare(dText(x));if(!ok){x.status='borrador';delete x.sentAt;dSave(x);toast('No se envió: la solicitud sigue abierta','err');vDScan();return;}}toast('Solicitud N° '+x.num+' enviada','ok',3000);go('dhome');};
+  if($('#dSend'))$('#dSend').onclick=()=>close(true);if($('#dOnly'))$('#dOnly').onclick=()=>close(false);
+  if($('#dDrop'))$('#dDrop').onclick=()=>{if(!confirm('¿Descartar esta solicitud?'))return;const x=dCur();DN.set(DN.all().filter(y=>y.id!==x.id));go('dhome');};}
+function dCode(c){c=String(c||'').trim();if(!c)return;const x=/^\d+$/.test(c)&&BYSKU.has(c)&&!findCode(c)?PR[BYSKU.get(c)]:findCode(c);
+  if(!x){fsInfo('⛔ Código '+c+' no está en la base','err');toast('⛔ Código '+c+' no está en la base','err');beep(220);return;}
+  beep(1800);vib(70);const wasCam=!$('#fs').classList.contains('hide');if(wasCam){camOff();$('#fs').classList.add('hide');}
+  const d0=dCur();const prev=d0&&d0.items.find(i=>i.sku===x.sku);
+  const sh=sheet(`<h2>${esc(x.desc)}</h2><div class="sub">${esc(short(x.cla))} · ${esc(x.gtin)} · OH ${fmt(x.oh)}</div>
+   ${prev?`<div class="card sub" style="margin-top:8px">Ya está en la solicitud: ${fmt(prev.qty)} und · ${esc(prev.mot)}. Lo que pongas se suma.</div>`:''}
+   <label class="f">Cantidad a donar</label><input class="inp" id="dQ" inputmode="numeric" placeholder="unidades">
+   <label class="f">Motivo</label><select class="sel" id="dM">${DMOT.map(m=>`<option>${m}</option>`).join('')}</select>
+   <label class="f">Fecha de vencimiento (opcional)</label><input class="inp" type="date" id="dF">
+   <div class="row" style="margin-top:14px"><button class="btn grow" id="dX">Cancelar</button><button class="btn pri grow" id="dOk">Agregar a la solicitud</button></div>`);
+  setTimeout(()=>{const q=sh.querySelector('#dQ');if(q)q.focus();},50);
+  const next=()=>{sh.remove();vDScan();if(wasCam)camOnF();};sh.querySelector('.x').onclick=next;sh.querySelector('#dX').onclick=next;
+  sh.querySelector('#dOk').onclick=()=>{const q=+sh.querySelector('#dQ').value||0;if(q<=0){toast('Pon la cantidad','err');return;}const m=sh.querySelector('#dM').value,f=sh.querySelector('#dF').value;
+    const d=dCur()||dNew();const ex=d.items.find(i=>i.sku===x.sku&&i.mot===m);if(ex){ex.qty+=q;if(f)ex.fv=f;}else d.items.push({sku:x.sku,gtin:x.gtin,desc:x.desc,cla:x.cla,qty:q,mot:m,fv:f||''});dSave(d);
+    toast('Agregado: '+q+' und','ok');next();};}
+function dEdit(k){const d=dCur();const i=d.items[k];if(!i)return;
+  const sh=sheet(`<h2>${esc(i.desc)}</h2><label class="f">Cantidad</label><input class="inp" id="eQ" inputmode="numeric" value="${i.qty}"><label class="f">Motivo</label><select class="sel" id="eM">${DMOT.map(m=>`<option ${m===i.mot?'selected':''}>${m}</option>`).join('')}</select><label class="f">Fecha de vencimiento (opcional)</label><input class="inp" type="date" id="eF" value="${i.fv||''}">
+   <div class="row" style="margin-top:14px"><button class="btn dan" id="eDel">Quitar</button><div class="grow"></div><button class="btn pri" id="eOk">Guardar</button></div>`);
+  sh.querySelector('#eOk').onclick=()=>{const q=+sh.querySelector('#eQ').value||0;if(q<=0){toast('Pon la cantidad','err');return;}i.qty=q;i.mot=sh.querySelector('#eM').value;i.fv=sh.querySelector('#eF').value;dSave(d);sh.remove();vDScan();};
+  sh.querySelector('#eDel').onclick=()=>{d.items.splice(k,1);dSave(d);sh.remove();vDScan();};}
+function dSheet(id,after){const d=DN.all().find(x=>x.id===id);if(!d)return;const AD=isAdmin();const s=DST[d.status];
+  const sh=sheet(`<h2>Solicitud N° ${d.num}</h2><div class="sub">${esc(d.userName)} · ${fdt(d.sentAt||d.created)} · <b>${s[0]}</b>${d.delAt?' el '+fdt(d.delAt)+' ('+esc(d.delBy||'')+')':''}</div>
+   <div class="sub" style="margin-top:6px">${d.items.length} producto(s) · ${fmt(dUnd(d))} unidad(es)${d.nota?' · Nota: '+esc(d.nota):''}</div>
+   <div style="margin-top:8px">${d.items.map(i=>dItem(i)).join('')||'<div class="empty">Sin productos</div>'}</div>
+   <div class="row" style="margin-top:14px;flex-wrap:wrap;gap:6px"><button class="btn sm" id="sWa">📤 WhatsApp</button><button class="btn sm" id="sCsv">⬇️ CSV</button>${AD?'<button class="btn sm dan" id="sDel">Borrar</button>':''}<div class="grow"></div>
+   ${AD&&d.status==='enviada'?'<button class="btn pri" id="sEnt">✓ Marcar entregada</button>':''}${AD&&d.status==='entregada'?'<button class="btn sm" id="sUn">Deshacer entrega</button>':''}</div>`);
+  sh.querySelector('#sWa').onclick=()=>doShare(dText(d));sh.querySelector('#sCsv').onclick=()=>dCsv([d]);
+  const e=sh.querySelector('#sEnt');if(e)e.onclick=()=>{d.status='entregada';d.delAt=Date.now();d.delBy=ME.name;dSave(d);sh.remove();toast('Solicitud N° '+d.num+' entregada','ok');after();};
+  const u=sh.querySelector('#sUn');if(u)u.onclick=()=>{d.status='enviada';delete d.delAt;delete d.delBy;dSave(d);sh.remove();after();};
+  const x=sh.querySelector('#sDel');if(x)x.onclick=()=>{if(!confirm('¿Borrar la solicitud N° '+d.num+'?'))return;DN.set(DN.all().filter(y=>y.id!==d.id));sh.remove();after();};}
+let DTAB='all';
+function vDHist(){const AD=isAdmin();const L=DN.all().filter(d=>d.status!=='borrador'&&(AD||d.userId===ME.id));
+  const sets={all:L,enviada:L.filter(d=>d.status==='enviada'),entregada:L.filter(d=>d.status==='entregada')};const tabs=[['all','Todas'],['enviada','Por entregar'],['entregada','Entregadas']];
+  $('#main').innerHTML=`<h1 style="font-size:22px">Historial de donaciones</h1><div class="sub">${AD?'Todas las solicitudes de la tienda':'Tus solicitudes'}</div>
+  <div class="row" style="flex-wrap:wrap;gap:6px;margin:10px 0">${tabs.map(([k,t])=>`<button class="btn sm ${DTAB===k?'pri':''}" data-t="${k}">${t} (${sets[k].length})</button>`).join('')}</div>
+  ${sets[DTAB].length?`<a id="dCsvAll" style="display:block;margin:8px 2px;cursor:pointer">⬇️ Descargar CSV (${sets[DTAB].length})</a>`:''}
+  <div class="card">${sets[DTAB].map(dRow).join('')||'<div class="empty">Nada por aquí</div>'}</div>`;
+  $$('[data-t]').forEach(b=>b.onclick=()=>{DTAB=b.dataset.t;vDHist();});const c=$('#dCsvAll');if(c)c.onclick=()=>dCsv(sets[DTAB]);bindDn(L,vDHist);}
+function codeIn(c){if(VIEW==='san')sanCode(String(c).trim());else if(MODE==='don'&&VIEW==='dscan')dCode(c);else if(MODE==='cal'&&QREV&&VIEW==='qscan')qCode(c);else scanCode(c);}
 /* ================= AJUSTES DE STOCK (conteo físico) ================= */
 const AJ={all:()=>LS.get('adjs',[]),set:l=>{l=l.slice(0,3000);track('j',AJ.all(),l);LS.set('adjs',l);}};
 function adjBlock(x){const p=AJ.all().find(a=>a.sku===x.sku&&!a.done);
@@ -808,11 +896,11 @@ function flashScan(ok,title,desc){const e=$('#fsOk');if(!e)return;e.style.backgr
   const m=$('#main');if(m&&$('#fs').classList.contains('hide')){m.style.transition='background .15s';m.style.background=ok==='ok'?'#dcfce7':ok==='info'?'#dbeafe':'#fee2e2';setTimeout(()=>{m.style.background='';},350);}}
 /* cámara */
 let stream=null,camRun=false,zx=null,lastC='',lastT=0;
-function fsInfo(msg,cls){const Q=MODE==='cal'&&QREV&&VIEW==='qscan';if(!REC&&!Q)return;const X=Q?QREV:REC;$('#fsA').textContent=(Q?'🧪 ':'')+X.aisleName;$('#fsC').textContent=X.cls?'Solo '+scopeTxt(X)+': '+recLbl(X):(X.aisleDesc||'Todo el pasillo');
+function fsInfo(msg,cls){if(MODE==='don'&&VIEW==='dscan'){const d=dCur();$('#fsA').textContent='🎁 Donación';$('#fsC').textContent='Solicitud '+(d?'N° '+d.num:'nueva');$('#fsN').textContent=(d?d.items.length:0)+' producto(s) · pistolea para agregar';$('#fsFin').textContent='Ver solicitud';if(msg){const e=$('#fsL');e.textContent=msg;e.style.background=cls==='err'?'rgba(220,38,38,.9)':'rgba(0,0,0,.55)';}return;}$('#fsFin').textContent='Finalizar recorrida';const Q=MODE==='cal'&&QREV&&VIEW==='qscan';if(!REC&&!Q)return;const X=Q?QREV:REC;$('#fsA').textContent=(Q?'🧪 ':'')+X.aisleName;$('#fsC').textContent=X.cls?'Solo '+scopeTxt(X)+': '+recLbl(X):(X.aisleDesc||'Todo el pasillo');
   if(Q)$('#fsN').textContent=Object.keys(QREV.seen).length+' revisados · pistolea un producto para cargar su fecha';else{const n=Object.keys(REC.scans).length,pl=planOf({cats:REC.classes}).length;$('#fsN').textContent=`${n} escaneados de ${fmt(pl)} en el plan`;const b=$('#fsBar');if(b)b.style.width=Math.min(100,n/Math.max(1,pl)*100)+'%';}
   if(msg){const e=$('#fsL');e.textContent=msg;e.style.background=cls==='err'?'rgba(220,38,38,.9)':cls==='ok'?'rgba(22,163,74,.85)':cls==='info'?'rgba(37,99,235,.85)':'rgba(0,0,0,.55)';}}
-function fsClose(){camOff();$('#fs').classList.add('hide');if(MODE==='cal'&&QREV&&VIEW==='qscan'){qScanUI();return;}if(REC&&VIEW==='scan'&&$('#pres'))renderPres();}
-$('#fsX').onclick=fsClose;$('#fsList').onclick=fsClose;$('#fsFin').onclick=()=>{$('#fs').classList.add('hide');if(MODE==='cal'&&QREV&&VIEW==='qscan')qFinish();else finish();};
+function fsClose(){camOff();$('#fs').classList.add('hide');if(MODE==='don'&&VIEW==='dscan'){vDScan();return;}if(MODE==='cal'&&QREV&&VIEW==='qscan'){qScanUI();return;}if(REC&&VIEW==='scan'&&$('#pres'))renderPres();}
+$('#fsX').onclick=fsClose;$('#fsList').onclick=fsClose;$('#fsFin').onclick=()=>{$('#fs').classList.add('hide');if(MODE==='don'&&VIEW==='dscan'){camOff();vDScan();return;}if(MODE==='cal'&&QREV&&VIEW==='qscan')qFinish();else finish();};
 $('#fsFis').onclick=()=>{if(!FSLAST)return;const s=FSLAST;fsClose();fisSheet(s);};
 $('#fsMan').onclick=()=>{$('#fsManW').classList.remove('hide');$('#fsIn').focus();};
 $('#fsAdd').onclick=()=>{codeIn($('#fsIn').value);$('#fsIn').value='';$('#fsIn').focus();};$('#fsIn').onkeydown=e=>{if(e.key==='Enter')$('#fsAdd').click();};
