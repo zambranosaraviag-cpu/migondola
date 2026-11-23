@@ -132,9 +132,10 @@ table.t td:first-child,table.t th:first-child{text-align:left}
   <div class="top"><button id="fsX" aria-label="Cerrar">✕</button><div style="flex:1;min-width:0"><b id="fsA"></b><div id="fsC" style="font-size:12px;opacity:.85"></div></div></div>
   <h3>Escanea el código de barras</h3>
   <div class="win"><i></i><i></i><i></i><i></i></div>
+  <div id="fsOk" style="position:absolute;top:20%;left:7%;right:7%;height:24%;display:none;flex-direction:column;align-items:center;justify-content:center;border-radius:14px;text-align:center;padding:10px;z-index:3"><div id="fsOkI" style="font-size:44px;line-height:1"></div><div id="fsOkT" style="font-size:20px;font-weight:800;margin-top:4px"></div><div id="fsOkD" style="font-size:14px;margin-top:4px;opacity:.95"></div></div>
   <div class="low"><button class="pill" id="fsMan">⌨️ Agregar código manualmente</button>
     <div class="man hide" id="fsManW"><input id="fsIn" inputmode="numeric" placeholder="Escribe el código"><button class="btn pri" id="fsAdd">Agregar</button></div>
-    <div class="cnt" id="fsN"></div><div class="last" id="fsL">Apunta al código de barras del producto</div></div>
+    <div class="cnt" id="fsN"></div><div class="bar" style="height:10px;background:rgba(255,255,255,.25);margin:6px 0 8px"><i id="fsBar" style="width:0;background:#22c55e;transition:width .3s"></i></div><div class="last" id="fsL">Apunta al código de barras del producto</div></div>
   <div class="bot"><button class="btn" id="fsList">Ver lista</button><button class="btn pri" id="fsFin">Finalizar recorrida</button></div>
 </div>
 
@@ -161,6 +162,7 @@ table.t td:first-child,table.t th:first-child{text-align:left}
   <button data-v="home"><b>🏠</b>Inicio</button>
   <button data-v="scan"><b>📷</b>Escanear</button>
   <button data-v="hist"><b>🕘</b>Historial</button>
+  <button data-v="av"><b>📈</b>Avance</button>
   <button data-v="rep"><b>📊</b>Reportes</button>
   <button data-v="prod"><b>📦</b>Productos</button>
   <button data-v="ais"><b>🗂️</b>Pasillos</button>
@@ -264,9 +266,9 @@ function setDB(db){
 }
 function findCode(c){const g=normG(c);let k=IDX.get('g'+g);if(k==null)k=IDX.get('s'+g);if(k==null&&g.length===12)k=IDX.get('g'+normG('0'+g));if(k==null&&g.length>8)k=IDX.get('g'+g.slice(0,-1));return k==null?null:PR[k];}
 // árbol División > Departamento > Subdepartamento > Clase (con conteo de productos activos)
-let TREE=null, CLS_CNT=new Map(), CLS_ALL=new Map();
-function buildTree(){TREE=new Map();CLS_CNT=new Map();CLS_ALL=new Map();
-  for(const x of PR){CLS_ALL.set(x.cla,(CLS_ALL.get(x.cla)||0)+1);if(!x.act)continue;CLS_CNT.set(x.cla,(CLS_CNT.get(x.cla)||0)+1);
+let TREE=null, CLS_CNT=new Map(), CLS_ALL=new Map(), CLS_SUB=new Map(), CLS_DIV=new Map();
+function buildTree(){TREE=new Map();CLS_CNT=new Map();CLS_ALL=new Map();CLS_SUB=new Map();CLS_DIV=new Map();
+  for(const x of PR){CLS_ALL.set(x.cla,(CLS_ALL.get(x.cla)||0)+1);CLS_SUB.set(x.cla,x.sub);CLS_DIV.set(x.cla,x.div);if(!x.act)continue;CLS_CNT.set(x.cla,(CLS_CNT.get(x.cla)||0)+1);
     if(!TREE.has(x.div))TREE.set(x.div,new Map());const D=TREE.get(x.div);if(!D.has(x.dep))D.set(x.dep,new Map());const S=D.get(x.dep);if(!S.has(x.sub))S.set(x.sub,new Set());S.get(x.sub).add(x.cla);}}
 const srt=a=>[...a].sort((x,y)=>String(x).localeCompare(String(y)));
 
@@ -280,7 +282,7 @@ let APPLYING=false,SYNCING=false,SYNC_ERR='';
 async function gzB64(o){const bl=await new Response(new Blob([JSON.stringify(o)]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();const u=new Uint8Array(bl);let s='';for(let i=0;i<u.length;i+=32768)s+=String.fromCharCode.apply(null,u.subarray(i,i+32768));return btoa(s);}
 async function unB64(b){const bin=Uint8Array.from(atob(b),c=>c.charCodeAt(0));return await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).json();}
 async function pushStock(){const url=syncUrl();if(!url||!LS.get('stockPend',0))return;const db=await idbGet('db');if(!db){LS.set('stockPend',0);return;}
-  const upd=LS.get('stockPend');const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({items:[{k:'d',id:'stock',upd,d:await gzB64(db)}]})});const j=await r.json();if(!j.ok)throw new Error('error del servidor');
+  const upd=LS.get('stockPend');const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({items:[{k:'d',id:'stock',upd,d:await gzB64(db)}]})});const j=await r.json();chkJ(j);
   LS.set('stockUpd',upd);if(LS.get('stockPend')===upd)LS.set('stockPend',0);}
 async function applyStock(it){if(!it.d||it.upd<=LS.get('stockUpd',0)||LS.get('stockPend',0))return;try{const db=await unB64(it.d);if(!db.products||!db.products.length)return;await idbSet('db',db);setDB(db);LS.set('stockUpd',it.upd);
   toast('Stock actualizado: '+(((db.meta.rango||'').match(/al (\S+)/)||[])[1]||''),'ok');if(ME&&['home','rep','prod'].includes(VIEW)&&!document.querySelector('.sheet')&&$('#fs').classList.contains('hide'))go(VIEW);}catch(e){}}
@@ -289,11 +291,12 @@ function track(k,prev,next){if(APPLYING||!syncUrl())return;const D=LS.get('dirty
   for(const[id]of pm)if(!nm.has(id))D[k+'|'+id]={k,id,upd:Date.now(),del:true};LS.set('dirty',D);setTimeout(syncNow,1500);}
 function syncBadge(){const e=$('#hSync');if(!e)return;if(!syncUrl()){e.textContent='';return;}const n=Object.keys(LS.get('dirty',{})).length;
   e.textContent=SYNC_ERR?'☁️✕':n?'☁️ '+n:'☁️✓';e.title=SYNC_ERR||(n?n+' cambio(s) por subir':'Sincronizado');e.style.color=SYNC_ERR?'var(--red)':n?'var(--amb)':'var(--g)';}
+function chkJ(j){if(!j.ok)throw new Error(j.error==='clave'?'clave incorrecta: abre el link nuevo que te pasó tu administrador':'error del servidor');}
 async function syncNow(){const url=syncUrl();if(!url||SYNCING)return;SYNCING=true;
   try{await pushStock();const D=LS.get('dirty',{});const keys=Object.keys(D).slice(0,40);
-    if(keys.length){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({items:keys.map(k=>D[k])})});const j=await r.json();if(!j.ok)throw new Error('error del servidor');
+    if(keys.length){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({items:keys.map(k=>D[k])})});const j=await r.json();chkJ(j);
       const D2=LS.get('dirty',{});for(const k of keys)if(D2[k]&&D2[k].upd===D[k].upd)delete D2[k];LS.set('dirty',D2);}
-    const since=LS.get('syncSince',0);const r=await fetch(url+(url.includes('?')?'&':'?')+'since='+since);const j=await r.json();if(!j.ok)throw new Error('error del servidor');
+    const since=LS.get('syncSince',0);const r=await fetch(url+(url.includes('?')?'&':'?')+'since='+since);const j=await r.json();chkJ(j);
     if(j.items.length)applyRemote(j.items);LS.set('syncSince',Math.max(0,j.now-120000));SYNC_ERR='';
     if(Object.keys(LS.get('dirty',{})).length)setTimeout(syncNow,500);
   }catch(e){SYNC_ERR='Sin conexión con la hoja: '+e.message;}finally{SYNCING=false;syncBadge();}}
@@ -303,8 +306,14 @@ function applyRemote(items){const st=items.filter(x=>x.k==='d'&&x.id==='stock').
         if(it.del){if(cur&&(cur.upd||0)<=it.upd){m.delete(it.id);c=true;}}else if(!cur||(cur.upd||0)<it.upd){m.set(it.id,it.d);c=true;}}
       if(c){let out=[...m.values()];if(k==='r'||k==='q')out.sort((a,b)=>b.start-a.start);if(k==='l')out.sort((a,b)=>b.created-a.created);if(k==='j')out.sort((a,b)=>b.ts-a.ts);set(out);ch=true;}}}finally{APPLYING=false;}
   if(ch){if(ME){const u=S.users().find(x=>x.id===ME.id);if(u)ME=u;}if(REC){const r=S.recs().find(x=>x.id===REC.id);if(r&&!(VIEW==='scan'&&REC.open))REC=r;}
-    if(ME&&!$('#fs').classList.contains('hide'))return;if(QREV&&QREV.open){const q=QS.revs().find(x=>x.id===QREV.id);if(q)QREV=q;}if(ME&&['home','hist','rep','qhome','qalert','qhist'].includes(VIEW)&&!document.querySelector('.sheet'))go(VIEW);if(!ME)showLogin();}}
-if('serviceWorker' in navigator&&isSecureContext&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});setInterval(syncNow,25000);window.addEventListener('online',syncNow);document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncNow();});
+    if(ME&&!$('#fs').classList.contains('hide'))return;if(QREV&&QREV.open){const q=QS.revs().find(x=>x.id===QREV.id);if(q)QREV=q;}if(ME&&['home','hist','av','rep','qhome','qalert','qhist'].includes(VIEW)&&!document.querySelector('.sheet'))go(VIEW);if(!ME)showLogin();}}
+if('serviceWorker' in navigator&&isSecureContext&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});setInterval(syncNow,25000);
+function cleanup(){try{if(!ME||!isAdmin()||LS.get('cleanDay','')===dayStr(Date.now()))return;LS.set('cleanDay',dayStr(Date.now()));const lim=Date.now()-60*864e5;
+  const R=S.recs(),R2=R.filter(r=>r.open||(r.end||r.start)>=lim);if(R2.length<R.length)S.setRecs(R2);
+  const Q=QS.revs(),Q2=Q.filter(r=>r.open||(r.end||r.start)>=lim);if(Q2.length<Q.length)QS.setRevs(Q2);
+  const L=QS.lots(),L2=L.filter(l=>!(l.status==='retirado'&&(l.retAt||l.upd||0)<lim));if(L2.length<L.length)QS.setLots(L2);
+  const J=AJ.all(),J2=J.filter(a=>!(a.done&&(a.upd||a.ts)<lim));if(J2.length<J.length)AJ.set(J2);}catch(e){}}
+setInterval(cleanup,600000);setTimeout(cleanup,20000);window.addEventListener('online',syncNow);document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncNow();});
 function syncSheet(){const sh=sheet(`<h2>Sincronización</h2><div class="sub">Con la sincronización activada, usuarios, pasillos y recorridas se guardan en tu Google Sheets y aparecen solos en todos los celulares. Sin internet la app sigue funcionando y sube los cambios cuando vuelve la señal.</div>
   <label class="f">Link de la hoja (termina en /exec)</label><input class="inp" id="syU" value="${esc(syncUrl())}" placeholder="https://script.google.com/macros/s/…/exec">
   <div class="sub" id="syS" style="margin-top:8px">${esc(SYNC_ERR||(syncUrl()?'Estado: '+(Object.keys(LS.get('dirty',{})).length||'sin')+' cambio(s) pendiente(s)':'Sincronización desactivada'))}</div>
@@ -314,17 +323,25 @@ function syncSheet(){const sh=sheet(`<h2>Sincronización</h2><div class="sub">Co
     LS.set('syncUrl',u);LS.set('syncSince',0);if(u){const D={};for(const[k,L]of[['u',S.users()],['a',S.aisles()],['r',S.recs()]])for(const x of L)D[k+'|'+x.id]={k,id:x.id,upd:x.upd||Date.now(),d:x};LS.set('dirty',D);}
     sh.querySelector('#syS').textContent='Conectando…';await syncNow();sh.querySelector('#syS').textContent=SYNC_ERR||'Conectado y sincronizado ✓';syncBadge();};}
 let ME=null; const isAdmin=()=>ME&&ME.role==='admin';
+const isRep=(r,s)=>!!(r&&r.rep&&r.rep[s]);
+const pendOf=r=>r.falt.filter(f=>f.oh>0&&!isRep(r,f.s));
+const scopeTxt=r=>r.grp==='sub'?'el subdepartamento':'la clase';
+function sortFalt(L){const tot={};for(const f of L)tot[f.c]=(tot[f.c]||0)+(f.v||0);return [...L].sort((a,b)=>(tot[b.c]-tot[a.c])||a.c.localeCompare(b.c)||(b.v||0)-(a.v||0));}
+function profInfo(){const m=((DB&&DB.meta&&DB.meta.fechaImpresion)||'').match(/(\d{1,2})-(\d{1,2})-0?(\d{2,4})/);if(!m)return null;let y=+m[3];if(y<100)y+=2000;const d=new Date(y,m[2]-1,+m[1]);const t=new Date();t.setHours(0,0,0,0);
+  return {age:Math.round((t-d)/864e5),txt:String(m[1]).padStart(2,'0')+'/'+String(m[2]).padStart(2,'0')};}
+function profBanner(){const p=profInfo();if(!p)return '';if(p.age<1)return `<div class="sub" style="margin:2px 2px 8px;color:var(--g)">📦 PROF del ${p.txt} (hoy) ✓</div>`;
+  return `<div class="card" style="background:#fee2e2;border:1px solid #fca5a5;color:#991b1b"><b>⚠️ La PROF es del ${p.txt}${p.age>1?' (hace '+p.age+' días)':' (de ayer)'}</b><div style="font-size:13px;margin-top:4px">${isAdmin()?'Carga la de hoy en Productos → Más acciones → Cargar reporte GSTPROFUND, para que el OH esté al día.':'El stock puede no estar al día. Avísale a tu administrador que cargue la PROF de hoy.'}</div></div>`;}
 function planOf(a,cls){const set=new Set(cls?[cls]:a.cats);return PR.filter(x=>x.act&&set.has(x.cla));}
 function aisleOfClass(c){return S.aisles().filter(a=>a.active!==false&&a.cats.includes(c));}
 
 /* ================= navegación ================= */
 let VIEW='home';
-const TITLES={qhome:'Calidad',qscan:'Revisar fechas',qalert:'Alertas de retiro',qhist:'Historial calidad',mode:'MiGondola',home:'Inicio',scan:'Escanear',hist:'Historial',rep:'Reportes',prod:'Productos',ais:'Pasillos',users:'Usuarios'};
+const TITLES={qhome:'Calidad',qscan:'Revisar fechas',qalert:'Alertas de retiro',qhist:'Historial calidad',mode:'MiGondola',home:'Inicio',scan:'Escanear',hist:'Historial',av:'Avance',rep:'Reportes',prod:'Productos',ais:'Pasillos',users:'Usuarios'};
 let HSTK=[],GARGS=[],GBACK=false;
 function goBack(){if(VIEW==='scan'&&!REC&&!/¿Qué pasillo/.test($('#main').textContent)||VIEW==='scan'&&REC&&!REC.open){REC=null;GBACK=true;go('scan');GBACK=false;return;}const h=HSTK.pop();GBACK=true;if(h)go(h[0],...h[1]);else go(MODE==='cal'?'qhome':'home');GBACK=false;}
 function go(v,...args){if(!GBACK&&VIEW&&!(VIEW===v&&!args.length&&!GARGS.length)&&VIEW!=='mode'){HSTK.push([VIEW,GARGS]);if(HSTK.length>30)HSTK.shift();}if(v==='mode')HSTK=[];GARGS=args.filter(a=>typeof a!=='object'||(a&&!a.rec&&!a.aisle));if((VIEW==='scan'||VIEW==='qscan')&&v!==VIEW)camOff();$$('#navQ button').forEach(b=>b.classList.toggle('on',b.dataset.q===v));$('#fs').classList.add('hide');$('#toasts').innerHTML='';VIEW=v;$$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
   $('#hBack').classList.toggle('hide',['home','qhome','mode'].includes(v));$('#crumb').textContent=TITLES[v]||'MiGondola';document.title='MiGondola — '+(TITLES[v]||'');window.scrollTo(0,0);
-  ({mode:vMode,qhome:vQHome,qscan:vQScan,qalert:vQAlert,qhist:vQHist,home:vHome,scan:vScan,hist:vHist,rep:vRep,prod:vProd,ais:vAis,users:vUsers})[v](...args);}
+  ({mode:vMode,qhome:vQHome,qscan:vQScan,qalert:vQAlert,qhist:vQHist,home:vHome,scan:vScan,hist:vHist,av:vAv,rep:vRep,prod:vProd,ais:vAis,users:vUsers})[v](...args);}
 $$('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));$$('#navQ button').forEach(b=>b.onclick=()=>{if(b.dataset.q==='qscan'&&QREV&&QREV.open){qScanUI();return;}go(b.dataset.q);});$('#hMode').onclick=()=>{camOff();go('mode');};$('#hBack').onclick=()=>{camOff();goBack();};
 $('#hOut').onclick=()=>{camOff();$('#fs').classList.add('hide');ME=null;LS.set('me',null);showLogin();};
 function act(ic,cls,t,s,id,red){return `<div class="act" id="${id}"><div class="ic ${cls}">${ic}</div><div class="grow"><div class="t ${red?'red':''}">${t}</div>${s?`<div class="s">${s}</div>`:''}</div><div class="ch">›</div></div>`;}
@@ -345,7 +362,7 @@ $('#lGo').onclick=async()=>{const u=$('#lUser').value.trim().toLowerCase(),p=$('
 function startApp(fromLogin){syncBadge();$('#hSync').onclick=()=>{if(isAdmin())syncSheet();else syncNow();};$('#hRole').textContent=isAdmin()?'ADMIN':'';$$('#nav button[data-v="ais"]').forEach(b=>b.classList.toggle('hide',!isAdmin()));if(fromLogin)go('mode');else setMode(MODE);}
 function vUsers(){if(!isAdmin()){go('home');return;}const U=S.users(),R=S.recs();
   $('#main').innerHTML=`<h1>Usuarios</h1><div class="sub">Altas, roles y contraseñas. Cada colaborador entra con su usuario y sus recorridas quedan a su nombre.</div>
-  <div class="card">${U.map(u=>{const n=R.filter(r=>r.userId===u.id).length;return `<div class="act" data-u="${u.id}"><div class="ic g">👤</div><div class="grow"><div class="t">${esc(u.name)}</div><div class="s">@${esc(u.user)} · ${n} recorrida(s)${u.off?' · desactivado':''}</div></div><span class="badge ${u.role==='admin'?'b':'off'}">${u.role==='admin'?'admin':'empleado'}</span><div class="ch">›</div></div>`}).join('')}</div>
+  <div class="card">${U.map(u=>{const n=R.filter(r=>r.userId===u.id).length;return `<div class="act" data-u="${u.id}"><div class="ic g">👤</div><div class="grow"><div class="t">${esc(u.name)}</div><div class="s">@${esc(u.user)} · ${n} recorrida(s)${(u.aisles||[]).length?' · '+u.aisles.length+' pasillo(s) asignado(s)':''}${u.off?' · desactivado':''}</div></div><span class="badge ${u.role==='admin'?'b':'off'}">${u.role==='admin'?'admin':'empleado'}</span><div class="ch">›</div></div>`}).join('')}</div>
   <button class="btn pri big" id="uNew">＋ Nuevo usuario</button>`;
   $('#uNew').onclick=()=>userForm(null);$$('[data-u]').forEach(e=>e.onclick=()=>userForm(e.dataset.u));}
 function userForm(id){const U=S.users();const u=id?U.find(x=>x.id===id):{name:'',user:'',role:'empleado'};
@@ -353,13 +370,14 @@ function userForm(id){const U=S.users();const u=id?U.find(x=>x.id===id):{name:''
    <label class="f">Usuario</label><input class="inp" id="fU" value="${esc(u.user)}" autocapitalize="none">
    <label class="f">${id?'Nueva contraseña (dejar vacío para no cambiar)':'Contraseña'}</label><input class="inp" id="fP" type="text">
    <label class="f">Rol</label><select class="sel" id="fR"><option value="empleado">Empleado (solo escanea y ve sus recorridas)</option><option value="admin">Administrador</option></select>
+   <label class="f">Pasillos asignados (opcional)</label><div class="sub">Al escanear verá primero estos pasillos. Si no marcas ninguno, ve todos.</div><div style="max-height:180px;overflow:auto;border:1px solid #e5e7eb;border-radius:10px;padding:6px 10px;margin-top:6px">${S.aisles().map(a=>`<label class="row" style="padding:4px 0;font-size:14px"><input type="checkbox" data-asg="${a.id}" ${(u.aisles||[]).includes(a.id)?'checked':''}> ${esc(a.name)}</label>`).join('')||'<div class="sub">No hay pasillos</div>'}</div>
    ${id?`<label class="row" style="margin-top:12px"><input type="checkbox" id="fOff" ${u.off?'checked':''}> Desactivado</label>`:''}
    <div class="row" style="margin-top:16px">${id&&id!==ME.id?'<button class="btn dan" id="fDel">Borrar</button>':''}<div class="grow"></div><button class="btn pri" id="fOk">Guardar</button></div>`);
   sh.querySelector('#fR').value=u.role;
   sh.querySelector('#fOk').onclick=async()=>{const n=sh.querySelector('#fN').value.trim(),us=sh.querySelector('#fU').value.trim().toLowerCase(),p=sh.querySelector('#fP').value;
     if(!n||!us){toast('Completa nombre y usuario','err');return;}if(U.some(x=>x.user===us&&x.id!==id)){toast('Ese usuario ya existe','err');return;}
     if(!id&&p.length<4){toast('Contraseña de al menos 4 caracteres','err');return;}
-    const o=id?u:{id:uid(),created:Date.now()};o.name=n;o.user=us;o.role=sh.querySelector('#fR').value;if(p)o.pass=await sha(p);if(id)o.off=sh.querySelector('#fOff').checked;
+    const o=id?u:{id:uid(),created:Date.now()};o.name=n;o.user=us;o.role=sh.querySelector('#fR').value;if(p)o.pass=await sha(p);if(id)o.off=sh.querySelector('#fOff').checked;o.aisles=[...sh.querySelectorAll('[data-asg]')].filter(c=>c.checked).map(c=>c.dataset.asg);
     if(!id)U.push(o);if(o.id===ME.id&&o.role!=='admin'&&!U.some(x=>x.role==='admin'&&x.id!==o.id)){toast('Debe quedar al menos un administrador','err');return;}
     S.setUsers(U);if(o.id===ME.id)ME=o;sh.remove();toast('Usuario guardado','ok');vUsers();};
   const del=sh.querySelector('#fDel');if(del)del.onclick=()=>{if(!confirm('¿Borrar este usuario? Sus recorridas se conservan.'))return;S.setUsers(U.filter(x=>x.id!==id));sh.remove();vUsers();};}
@@ -370,7 +388,7 @@ function latestByClass(days){const lim=days?Date.now()-days*864e5:0;const m=new 
   for(const r of S.recs()){if(r.open||r.end<lim)continue;for(const c of r.classes){const k=r.aisleId+'|'+c;const o=m.get(k);if(!o||o.end<r.end)m.set(k,r);}}return m;}
 function pending(days){const L=latestByClass(days);const out=[];
   for(const a of S.aisles()){if(a.active===false)continue;for(const c of a.cats){const r=L.get(a.id+'|'+c);if(!r)continue;
-    for(const f of r.falt)if(f.c===c&&f.oh>0)out.push({a,c,r,f});}}return out;}
+    for(const f of r.falt)if(f.c===c&&f.oh>0&&!isRep(r,f.s))out.push({a,c,r,f});}}return out;}
 
 /* ================= INICIO ================= */
 /* ================= módulo CALIDAD (fechas de vencimiento) ================= */
@@ -448,7 +466,7 @@ function qScanUI(auto){VIEW='qscan';$$('#navQ button').forEach(b=>b.classList.to
 function qFinish(){camOff();$('#fs').classList.add('hide');const r=QREV;r.open=false;r.end=Date.now();r.lots=QS.lots().filter(l=>l.revId===r.id).length;qSave();QREV=null;
   toast('Revisión terminada: '+Object.keys(r.seen).length+' revisados, '+r.lots+' con fecha corta','ok',3500);go('qhome');}
 function qCode(c){c=String(c||'').trim();if(!c||!QREV)return;const x=findCode(c);
-  if(!x){fsInfo('⛔ Código '+c+' no está en la base','err');toast('⛔ Código '+c+' no está en la base','err');beep(220);return;}
+  if(!x){fsInfo('⛔ Código '+c+' no está en la base','err');flashScan('err','Código no encontrado',c);toast('⛔ Código '+c+' no está en la base','err');beep(220);return;}
   if(!QREV.classes.includes(x.cla)){fsInfo('⛔ No es de esta revisión: '+short(x.cla),'err');toast('⛔ "'+x.desc+'" es de '+x.cla,'err',4000);beep(220);vib([60,60,60]);return;}
   QREV.seen[x.sku]=Date.now();qSave();beep(1800);vib(70);const wasCam=!$('#fs').classList.contains('hide');if(wasCam){camOff();$('#fs').classList.add('hide');}
   const prev=QS.lots().filter(l=>l.sku===x.sku&&l.status!=='retirado');
@@ -510,7 +528,7 @@ function vHome(){const A=S.aisles().filter(a=>a.active!==false);const L=latestBy
   const today=new Date().toLocaleDateString('es-PE',{weekday:'long',day:'numeric',month:'long'});
   const byA=new Map();for(const p of pend){const k=p.a.name;byA.set(k,(byA.get(k)||0)+1);}
   const open=S.recs().filter(r=>r.open&&r.userId===ME.id);
-  $('#main').innerHTML=`<div class="sub" style="margin-top:4px">🛒 MiGondola · ${esc(HOME_LOCAL)}</div><h1>Hola, ${esc(ME.name.split(' ')[0])}</h1><div class="sub" style="text-transform:capitalize">${today}</div>
+  $('#main').innerHTML=`<div class="sub" style="margin-top:4px">🛒 MiGondola · ${esc(HOME_LOCAL)}</div><h1>Hola, ${esc(ME.name.split(' ')[0])}</h1><div class="sub" style="text-transform:capitalize">${today}</div>${profBanner()}
   ${open.length?`<div class="card" style="border:1px solid var(--amb)"><b>Tienes ${open.length} recorrida(s) abierta(s)</b><div class="sub">${open.map(r=>esc(r.aisleName)+(r.cls?' · '+esc(short(r.cls)):'')).join(', ')}</div><button class="btn pri sm" id="hCont" style="margin-top:8px">📷 Seguir escaneando</button></div>`:''}
   <div class="sec">Resumen</div>
   <div class="card kp"><div><div class="kpi" style="padding:4px"><div class="v">${fmt(PR.filter(x=>x.act).length)}</div><div class="l">Productos activos</div></div></div>
@@ -600,29 +618,31 @@ let REC=null;
 function vScan(o={}){
   if(o.rec){REC=S.recs().find(r=>r.id===o.rec);if(REC){REC.open=true;REC.end=null;saveRec();return scanUI();}}
   const open=S.recs().find(r=>r.open&&r.userId===ME.id);
-  const A=S.aisles().filter(a=>a.active!==false);
-  if(o.aisle)return chooseScope(o.aisle);
-  $('#main').innerHTML=`<h1 style="font-size:22px">¿Qué pasillo vas a revisar?</h1><div class="sub">Escanea cada producto que esté exhibido. Lo que tenga stock y no escanees, sale como "en almacén: a reponer".</div>
+  const A0=S.aisles().filter(a=>a.active!==false);const my=new Set(ME.aisles||[]);const A=my.size?A0.filter(a=>my.has(a.id)):A0;const AO=my.size?A0.filter(a=>!my.has(a.id)):[];
+  if(o.aisle)return chooseScope(o.aisle);const aRow=a=>`<div class="act" data-a="${a.id}"><div class="ic y">🗂️</div><div class="grow"><div class="t">${esc(a.name)}</div><div class="s">${esc(a.desc||'')}${a.desc?' · ':''}${fmt(planOf(a).length)} productos en el plan</div></div><div class="ch">›</div></div>`;
+  $('#main').innerHTML=`${profBanner()}<h1 style="font-size:22px">¿Qué pasillo vas a revisar?</h1><div class="sub">Escanea cada producto que esté exhibido. Lo que tenga stock y no escanees, sale como "en almacén: a reponer".</div>
   ${open?`<div class="card" style="border:1px solid var(--amb)"><b>Recorrida abierta:</b> ${esc(open.aisleName)}${open.cls?' · '+esc(short(open.cls)):''} · ${Object.keys(open.scans).length} escaneados<div class="row" style="margin-top:8px"><button class="btn pri sm" id="sCont">📷 Seguir escaneando</button></div></div>`:''}
-  <div class="card">${A.map(a=>`<div class="act" data-a="${a.id}"><div class="ic y">🗂️</div><div class="grow"><div class="t">${esc(a.name)}</div><div class="s">${esc(a.desc||'')}${a.desc?' · ':''}${fmt(planOf(a).length)} productos en el plan</div></div><div class="ch">›</div></div>`).join('')||`<div class="empty">No hay pasillos activos.${isAdmin()?' Créalos en la pestaña Pasillos.':' Pide a tu administrador que los cree.'}</div>`}</div>`;
+  ${my.size?'<div class="sec">Tus pasillos</div>':''}<div class="card">${A.map(aRow).join('')||`<div class="empty">No hay pasillos activos.${isAdmin()?' Créalos en la pestaña Pasillos.':' Pide a tu administrador que los cree.'}</div>`}</div>${AO.length?`<details class="card"><summary><b>Otros pasillos (${AO.length})</b></summary>${AO.map(aRow).join('')}</details>`:''}`;
   const c=$('#sCont');if(c)c.onclick=()=>{REC=open;scanUI();};
   $$('[data-a]').forEach(e=>e.onclick=()=>chooseScope(e.dataset.a));}
 function chooseScope(aid){const a=S.aisles().find(x=>x.id===aid);if(!a){go('scan');return;}
-  const cls=srt(a.cats).filter(c=>CLS_CNT.get(c));
+  const cls=srt(a.cats).filter(c=>CLS_CNT.get(c));const subs=new Map();for(const c of cls){const s=CLS_SUB.get(c)||'Otros';if(!subs.has(s))subs.set(s,[]);subs.get(s).push(c);}
   $('#main').innerHTML=`<h1 style="font-size:22px">¿Qué vas a escanear?</h1><div class="sub">${esc(a.name)}${a.desc?' · '+esc(a.desc):''}</div>
   <label class="radio on" id="rAll"><input type="radio" name="sc" checked><div><b>Todo el pasillo</b><div class="sub">${fmt(planOf(a).length)} producto(s) en el plan</div></div></label>
+  <label class="radio" id="rSub"><input type="radio" name="sc"><div class="grow"><b>Solo un subdepartamento</b><div class="sub">Un grupo de clases, por ejemplo todo Limpieza o todo Juguetes</div>
+   <label class="f">Subdepartamento</label><select class="sel" id="sSub" disabled>${[...subs].sort((x,y)=>x[0].localeCompare(y[0])).map(([s,cs])=>`<option value="${esc(s)}">${esc(s)} · ${cs.length} clase(s) · ${fmt(cs.reduce((n,c)=>n+(CLS_CNT.get(c)||0),0))} producto(s)</option>`).join('')}</select></div></label>
   <label class="radio" id="rOne"><input type="radio" name="sc"><div class="grow"><b>Solo una clase</b><div class="sub">La recorrida compara únicamente esa clase del plan</div>
    <label class="f">Clase</label><select class="sel" id="sCls" disabled>${cls.map(c=>`<option value="${esc(c)}">${esc(c)} · ${CLS_CNT.get(c)} producto(s)</option>`).join('')}</select></div></label>
   <div class="row" style="margin-top:12px"><button class="btn" id="sBack">Volver</button><button class="btn pri" id="sGo">Empezar a escanear</button></div>`;
-  const upd=one=>{$('#rAll').classList.toggle('on',!one);$('#rOne').classList.toggle('on',one);$('#sCls').disabled=!one;};
-  $('#rAll').onclick=()=>upd(false);$('#rOne').onclick=()=>upd(true);$('#sBack').onclick=()=>go('scan');
-  $('#sGo').onclick=()=>{const one=$('#rOne').classList.contains('on');const c=one?$('#sCls').value:null;if(!a.cats.length){toast('Este pasillo no tiene productos asignados','err');return;}
-    REC={id:uid(),aisleId:a.id,aisleName:a.name,aisleDesc:a.desc||'',cls:c,classes:c?[c]:[...a.cats],userId:ME.id,userName:ME.name,start:Date.now(),end:null,open:true,scans:{},rej:[],falt:[],pres:0,plan:0,upd:Date.now()};
+  let MD='all';const upd=m=>{MD=m;$('#rAll').classList.toggle('on',m==='all');$('#rSub').classList.toggle('on',m==='sub');$('#rOne').classList.toggle('on',m==='one');$('#sCls').disabled=m!=='one';$('#sSub').disabled=m!=='sub';};
+  $('#rAll').onclick=()=>upd('all');$('#rSub').onclick=()=>upd('sub');$('#rOne').onclick=()=>upd('one');$('#sBack').onclick=()=>go('scan');
+  $('#sGo').onclick=()=>{const sv=MD==='sub'?$('#sSub').value:null;const c=MD==='one'?$('#sCls').value:sv;if(!a.cats.length){toast('Este pasillo no tiene productos asignados','err');return;}
+    REC={id:uid(),aisleId:a.id,aisleName:a.name,aisleDesc:a.desc||'',cls:c,grp:MD==='sub'?'sub':undefined,classes:MD==='one'?[c]:MD==='sub'?[...(subs.get(sv)||[])]:[...a.cats],rep:{},userId:ME.id,userName:ME.name,start:Date.now(),end:null,open:true,scans:{},rej:[],falt:[],pres:0,plan:0,upd:Date.now()};
     const R=S.recs();R.unshift(REC);S.setRecs(R);REC._auto=1;scanUI();};}
 function saveRec(){REC.upd=Date.now();const R=S.recs();const i=R.findIndex(r=>r.id===REC.id);if(i>=0)R[i]=REC;else R.unshift(REC);S.setRecs(R);}
 function scanUI(){VIEW='scan';$$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v==='scan'));const r=REC;
   $('#main').innerHTML=`<div class="card" style="padding:10px 14px"><div style="font-weight:600">${esc(r.aisleName)} <span class="sub">${esc(r.aisleDesc)}</span></div>
-   ${r.cls?`<div style="color:var(--ora);font-size:12px">Solo la clase: ${esc(r.cls)}</div>`:''}<div class="sub">Iniciada por ${esc(r.userName)} · ${fdt(r.start)}</div></div>
+   ${r.cls?`<div style="color:var(--ora);font-size:12px">Solo ${scopeTxt(r)}: ${esc(r.cls)}</div>`:''}<div class="sub">Iniciada por ${esc(r.userName)} · ${fdt(r.start)}</div></div>
   <button class="btn pri big" id="camOn" style="padding:18px;font-size:18px">📷 Escanear código de barras</button>
   <div class="sub" style="margin:6px 2px;text-align:center">Se abre la cámara. Si no abre, permite la cámara en el navegador (Chrome o Safari) o escribe el código abajo.</div>
   <div style="margin:10px 2px 6px"><b id="nSc" style="font-size:20px">0</b> <span class="sub">escaneados</span> <span class="sub" id="nPl"></span></div><div class="bar" style="margin-bottom:10px"><i id="nBar" style="width:0"></i></div>
@@ -645,24 +665,29 @@ function renderPres(){const r=REC;const ks=Object.keys(r.scans).sort((a,b)=>r.sc
   const plan=planOf({cats:r.classes});$('#nPl').textContent=`de ${fmt(plan.length)} en el plan`;$('#nBar').style.width=Math.min(100,ks.length/Math.max(1,plan.length)*100)+'%';$('#nPr').textContent=ks.length+' producto(s)';
   $('#pres').innerHTML=ks.slice(0,60).map(k=>{const x=PR[BYSKU.get(k)];return x?`<div class="it"><div class="grow"><div class="d">${esc(x.desc)}</div><div class="c">${idC(x,x.sku)} · ${esc(short(x.cla))}</div></div><span class="oh ${x.oh>0?'':'z'}">OH: ${fmt(x.oh)}</span></div>`:'';}).join('');}
 function scanCode(c){c=String(c||'').trim();if(!c||!REC)return;const x=findCode(c);
-  if(!x){toast('⛔ Código '+c+' no está en la base de '+HOME_LOCAL,'err',4000);fsInfo('⛔ Código '+c+' no está en la base','err');beep(220);return;}
+  if(!x){toast('⛔ Código '+c+' no está en la base de '+HOME_LOCAL,'err',4000);fsInfo('⛔ Código '+c+' no está en la base','err');flashScan('err','Código no encontrado',c);beep(220);return;}
   if(!REC.classes.includes(x.cla)){const where=aisleOfClass(x.cla).map(a=>a.name);
     toast(`⛔ No se registró: "${x.desc}" es de ${x.cla} y esta recorrida es ${REC.cls?'solo de '+REC.cls:'del pasillo '+REC.aisleName}${where.length?' (va en '+where.join(', ')+')':''}.`,'err',5000);
-    fsInfo('⛔ No se registró: es de '+x.cla,'err');if(!REC.rej.includes(x.sku)){REC.rej.push(x.sku);saveRec();}beep(220);vib([60,60,60]);return;}
-  if(REC.scans[x.sku]){toast('🔁 Ya registrado: '+x.desc,'info',1500);fsInfo('🔁 Ya registrado: '+x.desc,'info');return;}
-  REC.scans[x.sku]=Date.now();saveRec();toast('✅ '+x.desc+(x.act?'':' (producto '+x.est.toLowerCase()+')'),'ok',1600);beep(1800);vib(70);fsInfo('✅ '+x.desc,'ok');if($('#pres'))renderPres();}
+    fsInfo('⛔ No se registró: es de '+x.cla,'err');flashScan('err','No es de esta recorrida','Es de '+short(x.cla)+' · queda en Mal ubicados');if(!REC.rej.includes(x.sku)){REC.rej.push(x.sku);saveRec();}beep(220);vib([60,60,60]);return;}
+  if(REC.scans[x.sku]){toast('🔁 Ya registrado: '+x.desc,'info',1500);fsInfo('🔁 Ya registrado: '+x.desc,'info');flashScan('info','Ya estaba escaneado',x.desc);beep(1000);return;}
+  REC.scans[x.sku]=Date.now();saveRec();toast('✅ '+x.desc+(x.act?'':' (producto '+x.est.toLowerCase()+')'),'ok',1600);beep(1800);vib(70);fsInfo('✅ '+x.desc,'ok');flashScan('ok','¡ESCANEADO!',x.desc);if($('#pres'))renderPres();}
 function vib(p){try{navigator.vibrate&&navigator.vibrate(p);}catch(e){}}
-let actx;function beep(f){try{actx=actx||new AudioContext();const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=f;g.gain.value=.08;o.connect(g).connect(actx.destination);o.start();o.stop(actx.currentTime+(f<500?.25:.09));}catch(e){}}
+let actx;function tone(f,d,at=0){const o=actx.createOscillator(),g=actx.createGain();o.type=f<500?'square':'sine';o.frequency.value=f;g.gain.value=f<500?.18:.35;o.connect(g).connect(actx.destination);const s=actx.currentTime+at;o.start(s);o.stop(s+d);}
+function audioOn(){try{actx=actx||new AudioContext();if(actx.state==='suspended')actx.resume();}catch(e){}}
+function beep(f){try{audioOn();if(f<500){tone(f,.3);}else{tone(1400,.09);tone(2100,.14,.11);}}catch(e){}}
+document.addEventListener('pointerdown',audioOn,{once:true,capture:true});
+function flashScan(ok,title,desc){const e=$('#fsOk');if(!e)return;e.style.background=ok==='ok'?'rgba(22,163,74,.92)':ok==='info'?'rgba(37,99,235,.92)':'rgba(220,38,38,.92)';$('#fsOkI').textContent=ok==='ok'?'✅':ok==='info'?'🔁':'⛔';$('#fsOkT').textContent=title;$('#fsOkD').textContent=desc||'';e.style.display='flex';clearTimeout(flashScan.t);flashScan.t=setTimeout(()=>{e.style.display='none';},ok==='ok'?900:1600);
+  const m=$('#main');if(m&&$('#fs').classList.contains('hide')){m.style.transition='background .15s';m.style.background=ok==='ok'?'#dcfce7':ok==='info'?'#dbeafe':'#fee2e2';setTimeout(()=>{m.style.background='';},350);}}
 /* cámara */
 let stream=null,camRun=false,zx=null,lastC='',lastT=0;
-function fsInfo(msg,cls){const Q=MODE==='cal'&&QREV&&VIEW==='qscan';if(!REC&&!Q)return;const X=Q?QREV:REC;$('#fsA').textContent=(Q?'🧪 ':'')+X.aisleName;$('#fsC').textContent=X.cls?'Solo la clase: '+X.cls:(X.aisleDesc||'Todo el pasillo');
-  if(Q)$('#fsN').textContent=Object.keys(QREV.seen).length+' revisados · pistolea un producto para cargar su fecha';else{const n=Object.keys(REC.scans).length,pl=planOf({cats:REC.classes}).length;$('#fsN').textContent=`${n} escaneados de ${fmt(pl)} en el plan`;}
+function fsInfo(msg,cls){const Q=MODE==='cal'&&QREV&&VIEW==='qscan';if(!REC&&!Q)return;const X=Q?QREV:REC;$('#fsA').textContent=(Q?'🧪 ':'')+X.aisleName;$('#fsC').textContent=X.cls?'Solo '+(X.grp==='sub'?'el subdepartamento':'la clase')+': '+X.cls:(X.aisleDesc||'Todo el pasillo');
+  if(Q)$('#fsN').textContent=Object.keys(QREV.seen).length+' revisados · pistolea un producto para cargar su fecha';else{const n=Object.keys(REC.scans).length,pl=planOf({cats:REC.classes}).length;$('#fsN').textContent=`${n} escaneados de ${fmt(pl)} en el plan`;const b=$('#fsBar');if(b)b.style.width=Math.min(100,n/Math.max(1,pl)*100)+'%';}
   if(msg){const e=$('#fsL');e.textContent=msg;e.style.background=cls==='err'?'rgba(220,38,38,.9)':cls==='ok'?'rgba(22,163,74,.85)':cls==='info'?'rgba(37,99,235,.85)':'rgba(0,0,0,.55)';}}
 function fsClose(){camOff();$('#fs').classList.add('hide');if(MODE==='cal'&&QREV&&VIEW==='qscan'){qScanUI();return;}if(REC&&VIEW==='scan'&&$('#pres'))renderPres();}
 $('#fsX').onclick=fsClose;$('#fsList').onclick=fsClose;$('#fsFin').onclick=()=>{$('#fs').classList.add('hide');if(MODE==='cal'&&QREV&&VIEW==='qscan')qFinish();else finish();};
 $('#fsMan').onclick=()=>{$('#fsManW').classList.remove('hide');$('#fsIn').focus();};
 $('#fsAdd').onclick=()=>{codeIn($('#fsIn').value);$('#fsIn').value='';$('#fsIn').focus();};$('#fsIn').onkeydown=e=>{if(e.key==='Enter')$('#fsAdd').click();};
-async function camOnF(){const ok=c=>{const n=Date.now();if(c===lastC&&n-lastT<3000)return;lastC=c;lastT=n;codeIn(c);};
+async function camOnF(){audioOn();const ok=c=>{const n=Date.now();if(c===lastC&&n-lastT<3000)return;lastC=c;lastT=n;codeIn(c);};
   $('#fs').classList.remove('hide');$('#fsManW').classList.add('hide');fsInfo('Iniciando cámara…');camRun=true;const cam={set innerHTML(h){fsInfo(h.replace(/<[^>]+>/g,' '),'err');}};
   try{if('BarcodeDetector' in window){const fm=await BarcodeDetector.getSupportedFormats();const det=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','itf'].filter(f=>fm.includes(f))});
       stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}}});const v=$('#vid');v.srcObject=stream;await v.play();fsInfo('Apunta al código de barras del producto');
@@ -675,36 +700,70 @@ function computeFalt(r){const plan=planOf({cats:r.classes});const falt=[];let pr
   for(const x of plan){if(r.scans[x.sku]){pres++;continue;}falt.push({s:x.sku,d:x.desc,c:x.cla,oh:x.oh,v:+x.vel.toFixed(2)});}
   falt.sort((a,b)=>a.c.localeCompare(b.c)||b.v-a.v);return {falt,pres,plan:plan.length};}
 function finish(){camOff();const r=REC;Object.assign(r,computeFalt(r));r.end=Date.now();r.open=false;saveRec();result(r);}
-function result(r){const alm=r.falt.filter(f=>f.oh>0),sin=r.falt.filter(f=>f.oh<=0);const scn=Object.keys(r.scans).length;
-  $('#main').innerHTML=`<div class="row" style="margin-bottom:8px"><button class="btn sm" id="rBack">‹ Volver a pasillos</button><div class="grow"></div>${isAdmin()?'<button class="btn sm" id="rDel" style="color:var(--red)">🗑 Descartar recorrida</button>':''}</div><div class="card" style="background:#f0fdf4">✅ Recorrida de <b>${esc(r.aisleName)}</b>${r.cls?' (solo la clase '+esc(r.cls)+')':''} finalizada.<br>Se detectaron <b>${r.falt.length}</b> producto(s) que faltan exhibir: <b style="color:#e11d48">${alm.length} con stock en almacén (¡a reponer!)</b> y ${sin.length} sin stock.</div>
-  <div class="kp3"><div class="kpi"><div class="v">${scn}</div><div class="l">presentes</div></div><div class="kpi"><div class="v" style="color:#e11d48">${alm.length}</div><div class="l">en almacén</div></div><div class="kpi"><div class="v" style="color:var(--ora)">${sin.length}</div><div class="l">sin stock</div></div></div>
-  <div class="sec">Faltantes — hay que reponer <a id="rCsv">⇣ CSV</a></div>${faltList(alm)}
+function result(r){const alm=r.falt.filter(f=>f.oh>0),sin=r.falt.filter(f=>f.oh<=0),pnd=pendOf(r);const scn=Object.keys(r.scans).length;
+  $('#main').innerHTML=`<div class="row" style="margin-bottom:8px"><button class="btn sm" id="rBack">‹ Volver a pasillos</button><div class="grow"></div>${isAdmin()?'<button class="btn sm" id="rDel" style="color:var(--red)">🗑 Descartar recorrida</button>':''}</div><div class="card" style="background:#f0fdf4">✅ Recorrida de <b>${esc(r.aisleName)}</b>${r.cls?' (solo '+scopeTxt(r)+' '+esc(r.cls)+')':''} finalizada.<br>Se detectaron <b>${r.falt.length}</b> producto(s) que faltan exhibir: <b style="color:#e11d48">${alm.length} con stock en almacén (¡a reponer!)</b> y ${sin.length} sin stock.${alm.length-pnd.length?'<br>✓ '+(alm.length-pnd.length)+' ya repuesto(s).':''}</div>
+  <div class="kp3"><div class="kpi"><div class="v">${scn}</div><div class="l">presentes</div></div><div class="kpi"><div class="v" style="color:#e11d48">${pnd.length}</div><div class="l">por reponer</div></div><div class="kpi"><div class="v" style="color:var(--ora)">${sin.length}</div><div class="l">sin stock</div></div></div>
+  <div class="sec">Faltantes — hay que reponer (primero lo que más vende) <a id="rCsv">⇣ CSV</a></div><div class="sub" style="margin:-4px 2px 6px">Cuando lo repongas, toca ✓ Repuesto.</div>${faltList(alm,r)}
   ${sin.length?`<details class="card"><summary><b>Sin stock en almacén (${sin.length})</b> <span class="sub">no están en góndola y el sistema tampoco tiene stock: pedir reposición</span></summary>${faltList(sin)}</details>`:''}
-  ${r.rej.length?`<div class="card sub">⛔ ${r.rej.length} código(s) escaneado(s) no se registraron porque no son de esta recorrida.</div>`:''}
+  ${rejList(r)}
   <div class="row" style="flex-wrap:wrap;margin-top:12px"><button class="btn pri" id="rCont">📷 Seguir escaneando</button><button class="btn pri" id="rOther">Escanear otro pasillo</button><button class="btn" id="rHist">Ver historial</button><button class="btn" id="rShare">📤 WhatsApp</button></div>`;
   $('#rCont').onclick=()=>go('scan',{rec:r.id});$('#rOther').onclick=()=>{REC=null;go('scan');};$('#rHist').onclick=()=>go('hist');
   $('#rCsv').onclick=()=>csvRec(r);$('#rShare').onclick=()=>shareRec(r);
   $('#rBack').onclick=()=>{REC=null;go('scan');};
   if($('#rDel'))$('#rDel').onclick=()=>{if(!confirm('¿Descartar esta recorrida? No quedará en el historial.'))return;S.setRecs(S.recs().filter(x=>x.id!==r.id));REC=null;toast('Recorrida descartada');go('scan');};}
-function faltList(L){if(!L.length)return '<div class="empty">Nada por reponer 🎉</div>';let h='',cur=null;const cnt={};L.forEach(f=>cnt[f.c]=(cnt[f.c]||0)+1);
+function rejList(r){const L=(r.rej||[]).map(s=>PR[BYSKU.get(s)]).filter(Boolean);if(!L.length)return '';
+  return `<div class="sec">📍 Mal ubicados (${L.length}): llevar a su pasillo</div><div class="sub" style="margin:-4px 2px 6px">Se pistolearon aquí pero no son de ${r.cls?(r.grp==='sub'?'este subdepartamento':'esta clase'):'este pasillo'}.</div>`+L.map(x=>{const w=aisleOfClass(x.cla).map(a=>a.name).join(', ');return `<div class="it" data-sku="${esc(x.sku)}" style="border-left-color:#f59e0b"><div class="grow"><div class="d">${esc(x.desc)}</div><div class="c">${idC(x,x.sku)}</div><div class="c">Es de ${esc(short(x.cla))}${w?' · va en <b>'+esc(w)+'</b>':' · sin pasillo asignado'}</div></div></div>`;}).join('');}
+function faltList(L,r){if(!L.length)return '<div class="empty">Nada por reponer 🎉</div>';L=sortFalt(L);let h='',cur=null;const cnt={};L.forEach(f=>cnt[f.c]=(cnt[f.c]||0)+1);
   for(const f of L){if(f.c!==cur){cur=f.c;h+=`<div class="clsH"><span>${esc(cur)}</span><span>${cnt[cur]}</span></div>`;}const x=PR[BYSKU.get(f.s)];
-    h+=`<div class="it" data-sku="${esc(f.s)}"><div class="grow"><div class="d">${esc(f.d)}</div><div class="c">${idC(x,f.s)}${f.v?' · vende '+fmt(f.v,1)+' un/día':''}</div></div><span class="oh ${f.oh>0?'':'z'}">OH: ${fmt(f.oh)}</span></div>`;}return h;}
+    h+=`<div class="it" data-sku="${esc(f.s)}"><div class="grow"><div class="d">${esc(f.d)}</div><div class="c">${idC(x,f.s)}${f.v?' · vende '+fmt(f.v,1)+' un/día':''}</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none"><span class="oh ${f.oh>0?'':'z'}">OH: ${fmt(f.oh)}</span>${r&&f.oh>0?(isRep(r,f.s)?`<span style="font-size:11px;color:var(--g);font-weight:700">✓ Repuesto${r.rep[f.s].by?' · '+esc(r.rep[f.s].by.split(' ')[0]):''} ${new Date(r.rep[f.s].t).toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'})}${r.end?' ('+Math.max(0,Math.round((r.rep[f.s].t-r.end)/6e4))+' min)':''}</span>`:`<button class="btn sm pri" data-repu="${esc(r.id)}|${esc(f.s)}">✓ Repuesto</button>`):''}</div></div>`;}return h;}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-repu]');if(!b)return;e.stopPropagation();e.preventDefault();const [rid,s]=b.dataset.repu.split('|');
+  const R=S.recs();const r=R.find(x=>x.id===rid);if(!r)return;r.rep=r.rep||{};r.rep[s]={t:Date.now(),by:ME.name};S.setRecs(R);if(REC&&REC.id===rid)REC=r;toast('Marcado como repuesto ✓','ok');
+  const sh=b.closest('.sheet');if(sh){sh.remove();recDetail(rid);}else if(VIEW==='scan')result(r);else go(VIEW);},true);
 function csvRec(r){csvDownload(`recorrida_${r.aisleName.replace(/\W+/g,'_')}_${new Date(r.start).toISOString().slice(0,10)}.csv`,[['Pasillo','Clase recorrida','Usuario','Inicio','Fin','Resultado','Clase','SKU','GTIN','Descripcion','OH'],
   ...r.falt.map(f=>{const x=PR[BYSKU.get(f.s)]||{};return [r.aisleName,r.cls||'Todo el pasillo',r.userName,fdt(r.start),r.end?fdt(r.end):'',f.oh>0?'En almacen - reponer':'Sin stock',f.c,f.s,x.gtin||'',f.d,f.oh];}),
   ...Object.keys(r.scans).map(k=>{const x=PR[BYSKU.get(k)]||{};return [r.aisleName,r.cls||'Todo el pasillo',r.userName,fdt(r.start),r.end?fdt(r.end):'','Presente',x.cla||'',k,x.gtin||'',x.desc||'',x.oh??''];})]);}
 function waLine(sku,desc,oh){const x=PR[BYSKU.get(String(sku))]||{};return `• ${x.marca?x.marca+' · ':''}${x.desc||desc||''}\n   GTIN ${x.gtin||'-'} · SKU ${sku} · OH ${oh===''||oh==null?'-':fmt(oh)}`;}
-async function shareRec(r){const alm=r.falt.filter(f=>f.oh>0);let cur=null,t=`🛒 Recorrida ${r.aisleName}${r.cls?' ('+short(r.cls)+')':''} – ${r.userName} – ${fdt(r.end||Date.now())}\nPresentes: ${Object.keys(r.scans).length} · A reponer: ${alm.length}\n`;
-  for(const f of alm){if(f.c!==cur){cur=f.c;t+=`\n*${short(cur)}*\n`;}t+=waLine(f.s,f.d,f.oh)+'\n';}
+async function shareRec(r){const alm=r.falt.filter(f=>f.oh>0),pnd=sortFalt(pendOf(r));let cur=null,t=`🛒 Recorrida ${r.aisleName}${r.cls?' ('+short(r.cls)+')':''} – ${r.userName} – ${fdt(r.end||Date.now())}\nPresentes: ${Object.keys(r.scans).length} · A reponer: ${pnd.length}${alm.length-pnd.length?' · Ya repuestos: '+(alm.length-pnd.length):''}\n`;
+  for(const f of pnd){if(f.c!==cur){cur=f.c;t+=`\n*${short(cur)}*\n`;}t+=waLine(f.s,f.d,f.oh)+'\n';}
+  const rj=(r.rej||[]).map(s=>PR[BYSKU.get(s)]).filter(Boolean);
+  if(rj.length){t+=`\n📍 *Mal ubicados (${rj.length}): llevar a su pasillo*\n`;for(const x of rj){const w=aisleOfClass(x.cla).map(a=>a.name).join(', ');t+=waLine(x.sku,x.desc,x.oh)+`\n   Va en: ${w||short(x.cla)}\n`;}}
+  const aj=AJ.all().filter(a=>!a.done&&r.classes.includes(a.cla));
+  if(aj.length){t+=`\n📝 *Ajustar stock (${aj.length})*\n`;for(const a of aj){const d=a.fis-a.oh;t+=waLine(a.sku,a.desc,a.oh)+`\n   Físico ${fmt(a.fis)} · Sistema ${fmt(a.oh)} · Ajustar ${d>0?'+':''}${fmt(d)}\n`;}}
   try{if(navigator.share){await navigator.share({text:t});return;}}catch(e){if(e.name==='AbortError')return;}
   try{await navigator.clipboard.writeText(t);toast('Lista copiada: pégala en WhatsApp','ok');}catch(e){window.open('https://wa.me/?text='+encodeURIComponent(t));}}
+
+/* ================= AVANCE ================= */
+let AVD=1;const AVO=new Set();
+function avRows(days){const L=latestByClass(days);const out=[];
+  for(const a of S.aisles()){if(a.active===false)continue;for(const c of a.cats){const n=CLS_CNT.get(c)||0;if(!n)continue;const r=L.get(a.id+'|'+c);let pres=0,falt=0,rp=0;
+    if(r){for(const f of r.falt)if(f.c===c&&f.oh>0){if(isRep(r,f.s))rp++;else falt++;}for(const s in r.scans){const x=PR[BYSKU.get(s)];if(x&&x.cla===c)pres++;}}
+    out.push({a,c,div:CLS_DIV.get(c)||'Sin división',n,r,pres,falt,rp});}}return out;}
+function avAgg(L){const o={cls:L.length,done:0,pres:0,falt:0,rp:0};for(const x of L){if(x.r)o.done++;o.pres+=x.pres;o.falt+=x.falt;o.rp+=x.rp;}
+  o.av=o.cls?o.done/o.cls*100:0;const b=o.pres+o.rp+o.falt;o.cu=b?(o.pres+o.rp)/b*100:null;return o;}
+function avHead(name,o,big){const col=o.cu==null?'var(--mut)':o.cu>=95?'var(--g)':o.cu>=85?'var(--ora)':'var(--red)';
+  return `<div class="row" style="align-items:center;gap:8px"><div class="grow" style="min-width:0"><div style="font-weight:${big?700:600};font-size:${big?15:14}px">${esc(name)}</div>
+   <div class="bar" style="margin:6px 0 3px;height:8px"><i style="width:${o.av.toFixed(0)}%;background:#3b82f6"></i></div>
+   <div class="sub" style="font-size:12px">${o.done}/${o.cls} clases revisadas (${o.av.toFixed(0)}%)${o.rp?' · '+o.rp+' repuesto(s)':''}</div></div>
+   <div style="text-align:right;flex:none;min-width:70px"><div style="font-size:${big?22:18}px;font-weight:800;color:${col};line-height:1">${o.cu==null?'—':o.cu.toFixed(0)+'%'}</div><div style="font-size:11px;color:var(--mut)">cumplim.</div>
+   ${o.falt?`<div style="font-size:13px;font-weight:700;color:var(--red);margin-top:2px">${o.falt} faltan</div>`:o.done?'<div style="font-size:12px;font-weight:700;color:var(--g);margin-top:2px">✓ al día</div>':''}</div></div>`;}
+function vAv(){const R=avRows(AVD),T=avAgg(R);const g=new Map();for(const x of R){if(!g.has(x.div))g.set(x.div,[]);g.get(x.div).push(x);}
+  const det=(key,inner,head,lvl)=>`<details class="${lvl?'':'card'}" data-avk="${esc(key)}" ${AVO.has(key)?'open':''} style="${lvl?'border-top:1px solid #eef0f2;padding:8px 0 8px '+(lvl*10)+'px':''}"><summary style="list-style:none;cursor:pointer">${head}</summary><div style="margin-top:6px">${inner}</div></details>`;
+  $('#main').innerHTML=`<h1>Avance</h1><div class="chips">${[[1,'Hoy'],[7,'Últimos 7 días']].map(([v,l])=>`<button class="chip ${AVD===v?'on':''}" data-avd="${v}">${l}</button>`).join('')}</div>
+  <div class="sub" style="margin:6px 2px 10px">Toca una división para ver sus pasillos, y un pasillo para ver sus clases. <b>Cumplimiento</b> = productos exhibidos o repuestos sobre los que debían estar (con stock).</div>
+  <div class="card">${avHead('Tienda '+HOME_LOCAL,T,1)}</div>
+  ${[...g].sort((a,b)=>a[0].localeCompare(b[0])).map(([dv,L])=>{const pa=new Map();for(const x of L){if(!pa.has(x.a.id))pa.set(x.a.id,[]);pa.get(x.a.id).push(x);}
+    return det('d|'+dv,[...pa].map(([aid,LA])=>det('p|'+dv+'|'+aid,LA.sort((a,b)=>a.c.localeCompare(b.c)).map(x=>`<div class="row" ${x.r?`data-avr="${x.r.id}"`:''} style="padding:7px 0 7px 20px;border-top:1px dashed #eef0f2;font-size:13px;${x.r?'cursor:pointer':''}"><div class="grow" style="min-width:0"><div>${esc(short(x.c))}</div><div class="sub" style="font-size:11px">${x.r?fdt(x.r.end)+' · '+esc(x.r.userName)+' · '+x.pres+' presentes':'sin revisar · '+x.n+' producto(s)'}</div></div>${!x.r?'<span class="badge off">pendiente</span>':x.falt?`<span style="font-weight:800;color:var(--red)">${x.falt} faltan</span>`:'<span style="font-weight:700;color:var(--g)">✓ completo</span>'}</div>`).join(''),avHead(LA[0].a.name,avAgg(LA)),1)).join(''),avHead(dv,avAgg(L),1),0);}).join('')||'<div class="card empty">No hay pasillos activos.</div>'}`;
+  $$('[data-avd]').forEach(b=>b.onclick=()=>{AVD=+b.dataset.avd;vAv();});
+  $$('[data-avk]').forEach(d=>d.addEventListener('toggle',()=>{const k=d.dataset.avk;if(d.open)AVO.add(k);else AVO.delete(k);}));
+  $$('[data-avr]').forEach(e=>e.onclick=()=>recDetail(e.dataset.avr));}
 
 /* ================= HISTORIAL ================= */
 let HF='todas';
 function vHist(){let R=S.recs();if(!isAdmin())R=R.filter(r=>r.userId===ME.id);
   if(HF==='abiertas')R=R.filter(r=>r.open);if(HF==='cerradas')R=R.filter(r=>!r.open);if(HF==='mias')R=R.filter(r=>r.userId===ME.id);
   $('#main').innerHTML=`<h1>Recorridas</h1><div class="chips">${[['todas','Todas'],['abiertas','Abiertas'],['cerradas','Cerradas'],['mias','Solo mías']].map(([k,l])=>`<button class="chip ${HF===k?'on':''}" data-f="${k}">${l}</button>`).join('')}</div>
-  ${R.slice(0,150).map(r=>{const a=r.falt.filter(f=>f.oh>0).length;return `<div class="card" data-r="${r.id}" style="cursor:pointer"><div class="row"><div class="grow"><b>${esc(r.aisleName)}</b> <span class="sub">${esc(r.aisleDesc)}</span></div>${r.open?'':`<div style="text-align:center;flex:none;margin-left:8px;min-width:74px;padding:6px 10px;border-radius:12px;background:${a?'#fee2e2':'#dcfce7'};color:${a?'#dc2626':'#16a34a'}"><div style="font-size:28px;font-weight:800;line-height:1">${a?a:'✓ 0'}</div><div style="font-size:12px;font-weight:700">${a?'faltan':'completo'}</div></div>`}</div>
-    <div style="margin-top:4px">${r.open?'<span class="badge b">abierta</span> ':''}<span class="badge">${Object.keys(r.scans).length} presentes</span> ${r.cls?`<span class="badge o">solo clase ${esc(r.cls)}</span>`:'<span class="badge off">todo el pasillo</span>'}</div>
+  ${R.slice(0,150).map(r=>{const a=pendOf(r).length;return `<div class="card" data-r="${r.id}" style="cursor:pointer"><div class="row"><div class="grow"><b>${esc(r.aisleName)}</b> <span class="sub">${esc(r.aisleDesc)}</span></div>${r.open?'':`<div style="text-align:center;flex:none;margin-left:8px;min-width:74px;padding:6px 10px;border-radius:12px;background:${a?'#fee2e2':'#dcfce7'};color:${a?'#dc2626':'#16a34a'}"><div style="font-size:28px;font-weight:800;line-height:1">${a?a:'✓ 0'}</div><div style="font-size:12px;font-weight:700">${a?'faltan':'completo'}</div></div>`}</div>
+    <div style="margin-top:4px">${r.open?'<span class="badge b">abierta</span> ':''}<span class="badge">${Object.keys(r.scans).length} presentes</span> ${r.cls?`<span class="badge o">solo ${r.grp==='sub'?'subdep.':'clase'} ${esc(r.cls)}</span>`:'<span class="badge off">todo el pasillo</span>'}</div>
     <div class="row" style="margin-top:4px"><div class="sub grow">${fdt(r.start)} → ${r.end?fdt(r.end):'en curso'} · ${esc(r.userName)}</div>${isAdmin()?`<button class="btn sm" data-del="${r.id}" style="color:var(--red)">🗑 Eliminar</button>`:''}</div></div>`}).join('')||'<div class="card empty">Sin recorridas</div>'}`;
   $$('[data-f]').forEach(b=>b.onclick=()=>{HF=b.dataset.f;vHist();});$$('[data-r]').forEach(e=>e.onclick=()=>recDetail(e.dataset.r));
   $$('[data-del]').forEach(b=>b.onclick=e=>{e.stopPropagation();if(!isAdmin())return;const r=S.recs().find(x=>x.id===b.dataset.del);if(!r||!confirm('¿Eliminar la recorrida de '+r.aisleName+(r.cls?' ('+short(r.cls)+')':'')+' del '+fdt(r.start)+'?'))return;S.setRecs(S.recs().filter(x=>x.id!==r.id));if(REC&&REC.id===r.id)REC=null;toast('Recorrida eliminada','ok');vHist();});}
@@ -713,8 +772,8 @@ function recDetail(id){const r=S.recs().find(x=>x.id===id);if(!r)return;if(r.ope
   const sh=sheet(`<h2>${esc(r.aisleName)} <span class="sub">${esc(r.aisleDesc)}</span></h2>
    ${mine?'<button class="btn pri big" id="dCont">📷 Seguir escaneando</button>':''}
    <div class="sub" style="margin:8px 0">${fdt(r.start)} → ${r.end?fdt(r.end):'en curso'} · ${esc(r.userName)} · ${ks.length} escaneo(s)</div>
-   ${r.cls?`<div class="card sub">🔎 Esta recorrida se limitó a la clase ${esc(r.cls)}: los faltantes se calcularon solo sobre esa clase, no sobre todo el pasillo.</div>`:''}
-   <div class="sec">Faltan exhibir, en almacén (${alm.length})</div>${faltList(alm)}
+   ${r.cls?`<div class="card sub">🔎 Esta recorrida se limitó a ${scopeTxt(r)} ${esc(r.cls)}: los faltantes se calcularon solo sobre eso, no sobre todo el pasillo.</div>`:''}
+   <div class="sec">Faltan exhibir, en almacén (${pendOf(r).length} por reponer${alm.length-pendOf(r).length?' · '+(alm.length-pendOf(r).length)+' repuesto(s)':''})</div>${faltList(alm,r)}${rejList(r)}
    ${sin.length?`<div class="sub" style="margin:8px 2px">+ ${sin.length} faltante(s) sin stock en almacén (OH 0): nada para reponer, no se listan.</div>`:''}
    <div class="sec">Presentes (${ks.length})</div>${ks.map(k=>{const x=PR[BYSKU.get(k)];return `<div class="it"><div class="grow"><div class="d">${esc(x?x.desc:k)}</div><div class="c">${idC(x,k)} · OH ${x?fmt(x.oh):'-'}</div></div></div>`;}).join('')}
    <div class="row" style="margin-top:14px">${isAdmin()?'<button class="btn sm" id="dDel" style="color:var(--red)">🗑 Eliminar esta recorrida</button>':''}<div class="grow"></div><button class="btn sm" id="dCsv">⇣ Exportar CSV</button></div>`);
