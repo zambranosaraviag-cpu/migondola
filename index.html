@@ -161,11 +161,9 @@ table.t td:first-child,table.t th:first-child{text-align:left}
 <nav id="nav">
   <button data-v="home"><b>🏠</b>Inicio</button>
   <button data-v="scan"><b>📷</b>Escanear</button>
-  <button data-v="hist"><b>🕘</b>Historial</button>
   <button data-v="av"><b>📈</b>Avance</button>
   <button data-v="rep"><b>📊</b>Reportes</button>
-  <button data-v="prod"><b>📦</b>Productos</button>
-  <button data-v="ais"><b>🗂️</b>Pasillos</button>
+  <button data-v="more"><b>☰</b>Más</button>
 </nav>
 <nav id="navQ" class="hide">
   <button data-q="qhome"><b>🏠</b>Inicio</button>
@@ -330,18 +328,20 @@ function sortFalt(L){const tot={};for(const f of L)tot[f.c]=(tot[f.c]||0)+(f.v||
 function profInfo(){const m=((DB&&DB.meta&&DB.meta.fechaImpresion)||'').match(/(\d{1,2})-(\d{1,2})-0?(\d{2,4})/);if(!m)return null;let y=+m[3];if(y<100)y+=2000;const d=new Date(y,m[2]-1,+m[1]);const t=new Date();t.setHours(0,0,0,0);
   return {age:Math.round((t-d)/864e5),txt:String(m[1]).padStart(2,'0')+'/'+String(m[2]).padStart(2,'0')};}
 function profBanner(){const p=profInfo();if(!p)return '';if(p.age<1)return `<div class="sub" style="margin:2px 2px 8px;color:var(--g)">📦 PROF del ${p.txt} (hoy) ✓</div>`;
-  return `<div class="card" style="background:#fee2e2;border:1px solid #fca5a5;color:#991b1b"><b>⚠️ La PROF es del ${p.txt}${p.age>1?' (hace '+p.age+' días)':' (de ayer)'}</b><div style="font-size:13px;margin-top:4px">${isAdmin()?'Carga la de hoy en Productos → Más acciones → Cargar reporte GSTPROFUND, para que el OH esté al día.':'El stock puede no estar al día. Avísale a tu administrador que cargue la PROF de hoy.'}</div></div>`;}
+  return `<div class="card" style="background:#fee2e2;border:1px solid #fca5a5;color:#991b1b"><b>⚠️ La PROF es del ${p.txt}${p.age>1?' (hace '+p.age+' días)':' (de ayer)'}</b><div style="font-size:13px;margin-top:4px">${isAdmin()?'Carga la de hoy en Más → Datos de stock → Cargar reportes, para que el OH esté al día.':'El stock puede no estar al día. Avísale a tu administrador que cargue la PROF de hoy.'}</div></div>`;}
 function planOf(a,cls){const set=new Set(cls?[cls]:a.cats);return PR.filter(x=>x.act&&set.has(x.cla));}
 function aisleOfClass(c){return S.aisles().filter(a=>a.active!==false&&a.cats.includes(c));}
 
 /* ================= navegación ================= */
 let VIEW='home';
-const TITLES={qhome:'Calidad',qscan:'Revisar fechas',qalert:'Alertas de retiro',qhist:'Historial calidad',mode:'MiGondola',home:'Inicio',scan:'Escanear',hist:'Historial',av:'Avance',rep:'Reportes',prod:'Productos',ais:'Pasillos',users:'Usuarios'};
+const NAVOF={hist:'av',prod:'more',ais:'more',users:'more'};
+const TITLES={more:'Más',qhome:'Calidad',qscan:'Revisar fechas',qalert:'Alertas de retiro',qhist:'Historial calidad',mode:'MiGondola',home:'Inicio',scan:'Escanear',hist:'Historial',av:'Avance',rep:'Reportes',prod:'Productos',ais:'Pasillos',users:'Usuarios'};
 let HSTK=[],GARGS=[],GBACK=false;
 function goBack(){if(VIEW==='scan'&&!REC&&!/¿Qué pasillo/.test($('#main').textContent)||VIEW==='scan'&&REC&&!REC.open){REC=null;GBACK=true;go('scan');GBACK=false;return;}const h=HSTK.pop();GBACK=true;if(h)go(h[0],...h[1]);else go(MODE==='cal'?'qhome':'home');GBACK=false;}
-function go(v,...args){if(!GBACK&&VIEW&&!(VIEW===v&&!args.length&&!GARGS.length)&&VIEW!=='mode'){HSTK.push([VIEW,GARGS]);if(HSTK.length>30)HSTK.shift();}if(v==='mode')HSTK=[];GARGS=args.filter(a=>typeof a!=='object'||(a&&!a.rec&&!a.aisle));if((VIEW==='scan'||VIEW==='qscan')&&v!==VIEW)camOff();$$('#navQ button').forEach(b=>b.classList.toggle('on',b.dataset.q===v));$('#fs').classList.add('hide');$('#toasts').innerHTML='';VIEW=v;$$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+function go(v,...args){if(!GBACK&&VIEW&&!(VIEW===v&&!args.length&&!GARGS.length)&&VIEW!=='mode'){HSTK.push([VIEW,GARGS]);if(HSTK.length>30)HSTK.shift();}if(v==='mode')HSTK=[];GARGS=args.filter(a=>typeof a!=='object'||(a&&!a.rec&&!a.aisle));if((VIEW==='scan'||VIEW==='qscan')&&v!==VIEW)camOff();$$('#navQ button').forEach(b=>b.classList.toggle('on',b.dataset.q===v));$('#fs').classList.add('hide');$('#toasts').innerHTML='';VIEW=v;const nv=NAVOF[v]||v;$$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===nv));
   $('#hBack').classList.toggle('hide',['home','qhome','mode'].includes(v));$('#crumb').textContent=TITLES[v]||'MiGondola';document.title='MiGondola — '+(TITLES[v]||'');window.scrollTo(0,0);
-  ({mode:vMode,qhome:vQHome,qscan:vQScan,qalert:vQAlert,qhist:vQHist,home:vHome,scan:vScan,hist:vHist,av:vAv,rep:vRep,prod:vProd,ais:vAis,users:vUsers})[v](...args);}
+  ({mode:vMode,qhome:vQHome,qscan:vQScan,qalert:vQAlert,qhist:vQHist,home:vHome,scan:vScan,hist:vHist,av:vAv,rep:vRep,prod:vProd,ais:vAis,users:vUsers,more:vMore})[v](...args);}
+document.addEventListener('click',e=>{if(e.target.closest('#avHist'))go('hist');});
 $$('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));$$('#navQ button').forEach(b=>b.onclick=()=>{if(b.dataset.q==='qscan'&&QREV&&QREV.open){qScanUI();return;}go(b.dataset.q);});$('#hMode').onclick=()=>{camOff();go('mode');};$('#hBack').onclick=()=>{camOff();goBack();};
 $('#hOut').onclick=()=>{camOff();$('#fs').classList.add('hide');ME=null;LS.set('me',null);showLogin();};
 function act(ic,cls,t,s,id,red){return `<div class="act" id="${id}"><div class="ic ${cls}">${ic}</div><div class="grow"><div class="t ${red?'red':''}">${t}</div>${s?`<div class="s">${s}</div>`:''}</div><div class="ch">›</div></div>`;}
@@ -359,7 +359,7 @@ $('#lGo').onclick=async()=>{const u=$('#lUser').value.trim().toLowerCase(),p=$('
   const me=U.find(x=>x.user===u);if(!me||me.pass!==await sha(p)){toast('Usuario o contraseña incorrectos','err');return;}
   if(me.off){toast('Este usuario está desactivado','err');return;}
   ME=me;LS.set('me',me.id);$('#login').classList.add('hide');startApp(true);};
-function startApp(fromLogin){syncBadge();$('#hSync').onclick=()=>{if(isAdmin())syncSheet();else syncNow();};$('#hRole').textContent=isAdmin()?'ADMIN':'';$$('#nav button[data-v="ais"]').forEach(b=>b.classList.toggle('hide',!isAdmin()));if(fromLogin)go('mode');else setMode(MODE);}
+function startApp(fromLogin){syncBadge();$('#hSync').onclick=()=>{if(isAdmin())syncSheet();else syncNow();};$('#hRole').textContent=isAdmin()?'ADMIN':'';if(fromLogin)go('mode');else setMode(MODE);}
 function vUsers(){if(!isAdmin()){go('home');return;}const U=S.users(),R=S.recs();
   $('#main').innerHTML=`<h1>Usuarios</h1><div class="sub">Altas, roles y contraseñas. Cada colaborador entra con su usuario y sus recorridas quedan a su nombre.</div>
   <div class="card">${U.map(u=>{const n=R.filter(r=>r.userId===u.id).length;return `<div class="act" data-u="${u.id}"><div class="ic g">👤</div><div class="grow"><div class="t">${esc(u.name)}</div><div class="s">@${esc(u.user)} · ${n} recorrida(s)${(u.aisles||[]).length?' · '+u.aisles.length+' pasillo(s) asignado(s)':''}${u.off?' · desactivado':''}</div></div><span class="badge ${u.role==='admin'?'b':'off'}">${u.role==='admin'?'admin':'empleado'}</span><div class="ch">›</div></div>`}).join('')}</div>
@@ -528,26 +528,32 @@ function vHome(){const A=S.aisles().filter(a=>a.active!==false);const L=latestBy
   const today=new Date().toLocaleDateString('es-PE',{weekday:'long',day:'numeric',month:'long'});
   const byA=new Map();for(const p of pend){const k=p.a.name;byA.set(k,(byA.get(k)||0)+1);}
   const open=S.recs().filter(r=>r.open&&r.userId===ME.id);
-  $('#main').innerHTML=`<div class="sub" style="margin-top:4px">🛒 MiGondola · ${esc(HOME_LOCAL)}</div><h1>Hola, ${esc(ME.name.split(' ')[0])}</h1><div class="sub" style="text-transform:capitalize">${today}</div>${profBanner()}${todayCard(1)}${weekTable()}
+  $('#main').innerHTML=`<div class="sub" style="margin-top:4px">🛒 MiGondola · ${esc(HOME_LOCAL)}</div><h1>Hola, ${esc(ME.name.split(' ')[0])}</h1><div class="sub" style="text-transform:capitalize">${today}</div>${profBanner()}${todayCard(1)}
   ${open.length?`<div class="card" style="border:1px solid var(--amb)"><b>Tienes ${open.length} recorrida(s) abierta(s)</b><div class="sub">${open.map(r=>esc(r.aisleName)+(r.cls?' · '+esc(short(r.cls)):'')).join(', ')}</div><button class="btn pri sm" id="hCont" style="margin-top:8px">📷 Seguir escaneando</button></div>`:''}
+  <div class="sec">Reposición pendiente ${pend.length?'<a id="hCsv">⇣ CSV</a>':''}</div>
+  <div class="card">${pend.length?[...byA].sort((a,b)=>b[1]-a[1]).map(([n,c])=>`<div class="act" data-pa="${esc(n)}"><div class="ic o">📦</div><div class="grow"><div class="t">${esc(n)}</div><div class="s">${c} producto(s) con stock en almacén para subir a góndola</div></div><div class="ch">›</div></div>`).join(''):'<div class="empty">Sin reposición pendiente. Escanea un pasillo para ver qué falta exhibir.</div>'}</div>
+  <div class="card">${act('📝','b','Ajustes de stock',(AJ.all().filter(a=>!a.done).length||'Sin')+' conteo(s) físico(s) pendiente(s) · exportar para ajustar','aAdj')}</div>`;
+  const c=$('#hCont');if(c)c.onclick=()=>go('scan',{rec:open[0].id});
+  const cs=$('#hCsv');if(cs)cs.onclick=()=>csvPending(pend);
+  $$('[data-pa]').forEach(e=>e.onclick=()=>go('rep','repo'));
+  $('#aAdj').onclick=adjSheet;}
+function vMore(){const A=S.aisles().filter(a=>a.active!==false);const L=latestByClass(7);const rev=new Set([...L.values()].map(r=>r.aisleId)).size;const pend=pending(7);
+  $('#main').innerHTML=`<h1>Más</h1>
   <div class="sec">Resumen</div>
   <div class="card kp"><div><div class="kpi" style="padding:4px"><div class="v">${fmt(PR.filter(x=>x.act).length)}</div><div class="l">Productos activos</div></div></div>
    <div><div class="kpi" style="padding:4px"><div class="v">${A.length}</div><div class="l">Pasillos activos</div></div></div>
    <div><div class="kpi" style="padding:4px"><div class="v" style="color:var(--g)">${rev}</div><div class="l">Pasillos revisados (7 días)</div></div></div>
    <div><div class="kpi" style="padding:4px"><div class="v" style="color:#e11d48">${pend.length}</div><div class="l">Faltan por exhibir</div></div></div></div>
-  <div class="sec">Reposición pendiente ${pend.length?'<a id="hCsv">⇣ CSV</a>':''}</div>
-  <div class="card">${pend.length?[...byA].sort((a,b)=>b[1]-a[1]).map(([n,c])=>`<div class="act" data-pa="${esc(n)}"><div class="ic o">📦</div><div class="grow"><div class="t">${esc(n)}</div><div class="s">${c} producto(s) con stock en almacén para subir a góndola</div></div><div class="ch">›</div></div>`).join(''):'<div class="empty">Sin reposición pendiente. Escanea un pasillo para ver qué falta exhibir.</div>'}</div>
-  <div class="sec">Acciones</div>
-  <div class="card">${act('📷','g','Escanear un pasillo','Empezar una recorrida','aScan')}
-   ${isAdmin()?act('👥','b','Usuarios','Altas, roles y contraseñas','aUsers'):''}
-   ${isAdmin()?act('☁️','g','Sincronización',syncUrl()?(SYNC_ERR?'Sin conexión con la hoja':'Activada con Google Sheets'):'Desactivada · conectar con Google Sheets','aSy'):''}
-   ${isAdmin()?act('🔄','v','Compartir datos por archivo','Exportar o importar pasillos, usuarios y recorridas','aBk'):''}
-   ${act('📝','b','Ajustes de stock',(AJ.all().filter(a=>!a.done).length||'Sin')+' conteo(s) físico(s) pendiente(s) · exportar para ajustar','aAdj')}
-   ${act('🗓️','y','Datos de stock','Reporte del '+esc(((DB.meta.rango||'').match(/al (\S+)/)||[])[1]||'')+(isAdmin()?' · cargar reporte nuevo':''),'aData')}</div>`;
-  const c=$('#hCont');if(c)c.onclick=()=>go('scan',{rec:open[0].id});
-  const cs=$('#hCsv');if(cs)cs.onclick=()=>csvPending(pend);
-  $$('[data-pa]').forEach(e=>e.onclick=()=>go('rep','repo'));
-  $('#aScan').onclick=()=>go('scan');const u=$('#aUsers');if(u)u.onclick=()=>go('users');const b=$('#aBk');if(b)b.onclick=backupSheet;const sy=$('#aSy');if(sy)sy.onclick=syncSheet;$('#aData').onclick=dataSheet;$('#aAdj').onclick=adjSheet;}
+  <div class="card">${act('📦','o','Productos','Buscar un producto, su stock y en qué pasillo va','mProd')}
+   ${act('🕘','b','Historial de recorridas',isAdmin()?'Todas las recorridas':'Tus recorridas','mHist')}
+   ${act('🗓️','v','Plan de la semana','Qué toca cada día por equipo','mWeek')}
+   ${act('🗓️','y','Datos de stock','Reporte del '+esc(((DB.meta.rango||'').match(/al (\S+)/)||[])[1]||'')+(isAdmin()?' · cargar reporte nuevo':''),'aData')}</div>
+  ${isAdmin()?`<div class="sec">Administración</div><div class="card">${act('🗂️','y','Pasillos','Clases de cada pasillo, plan por clase, activar o borrar','mAis')}
+   ${act('👥','b','Usuarios','Altas, roles, contraseñas y pasillos asignados','aUsers')}
+   ${act('☁️','g','Sincronización',syncUrl()?(SYNC_ERR?'Sin conexión con la hoja':'Activada con Google Sheets'):'Desactivada · conectar con Google Sheets','aSy')}
+   ${act('🔄','v','Compartir datos por archivo','Exportar o importar pasillos, usuarios y recorridas','aBk')}</div>`:''}`;
+  $('#mProd').onclick=()=>go('prod');$('#mHist').onclick=()=>go('hist');$('#mWeek').onclick=()=>{const sh=sheet(weekTable());sh.querySelectorAll('.card').forEach(c=>c.style.boxShadow='none');};$('#aData').onclick=dataSheet;
+  const on=(id,f)=>{const e=$('#'+id);if(e)e.onclick=f;};on('mAis',()=>go('ais'));on('aUsers',()=>go('users'));on('aBk',backupSheet);on('aSy',syncSheet);}
 function csvPending(pend){csvDownload('reposicion_pendiente.csv',[['Pasillo','Clase','SKU','GTIN','Descripcion','OH','Recorrida','Usuario'],...pend.map(p=>{const x=PR[BYSKU.get(p.f.s)]||{};return [p.a.name,short(p.c),p.f.s,x.gtin||'',p.f.d,p.f.oh,fdt(p.r.end),p.r.userName];})]);}
 function dataSheet(){const fi=(DB.meta.fechaImpresion||'');
   const sh=sheet(`<h2>Datos de stock</h2><div class="card sub"><b>${esc(DB.meta.empresa)}</b> — ${esc(DB.meta.reporte)}<br>${esc(DB.meta.rango)} (${DAYS} días)<br>Impreso: ${esc(fi)}<br>Archivos: ${esc((DB.meta.archivos||[]).join(', '))}<br>${fmt(PR.length)} productos en ${esc(HOME_LOCAL)}</div>
@@ -573,13 +579,17 @@ $('#fileBk').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!
 /* ================= PASILLOS ================= */
 function vAis(){if(!isAdmin()){go('home');return;}const A=S.aisles();
   $('#main').innerHTML=`<h1>Pasillos</h1><div class="card sub">Define los pasillos y asigna qué productos deben estar en cada uno. Ese "plan" es lo que la app compara contra lo escaneado.</div>
-  ${A.map(a=>{const n=planOf(a).length;return `<div class="card"><div class="row"><div class="grow"><div style="font-weight:600">${esc(a.name)}</div><div class="sub">${esc(a.desc||'')}${a.desc?' · ':''}${fmt(n)} en el plan · ${a.cats.length} clase(s)</div></div><span class="badge ${a.active===false?'off':''}">${a.active===false?'inactivo':'activo'}</span></div>
-    ${act('📷','g','Escanear este pasillo','','s_'+a.id)}${act('🗂️','y','Asignar productos','Por clase o subdepartamento','p_'+a.id)}${act('📅','b','Días de revisión','Por clase · '+((a.plan&&a.plan.days)||[]).map(d=>DIAS[d]).join(', '),'c_'+a.id)}${act('✏️','v','Editar pasillo','Código, nombre, desactivar o borrar','e_'+a.id)}
-    ${act(a.active===false?'▶️':'⏸️','o',a.active===false?'Activar':'Desactivar','','t_'+a.id)}${act('🗑️','r','Borrar pasillo','','d_'+a.id,1)}</div>`}).join('')||'<div class="card empty">Todavía no hay pasillos. Crea el primero, por ejemplo "BASICOS" con las clases Aceites, Arroz, Pastas…</div>'}
+  ${A.length?`<div class="card">${A.map(a=>{const n=planOf(a).length;return `<div class="act" data-aopt="${a.id}"><div class="ic ${a.active===false?'off':'y'}">🗂️</div><div class="grow"><div class="t">${esc(a.name)}</div><div class="s">${fmt(n)} en el plan · ${a.cats.length} clase(s)${a.active===false?' · <b>inactivo</b>':''}</div></div><div class="ch">›</div></div>`;}).join('')}</div>`:'<div class="card empty">Todavía no hay pasillos. Crea el primero, por ejemplo "BASICOS" con las clases Aceites, Arroz, Pastas…</div>'}
   <button class="btn pri big" id="aNew" style="margin-top:6px">＋ Nuevo pasillo</button>
   ${!A.length?'<button class="btn big" id="aAuto" style="margin-top:8px">Crear un pasillo por departamento (para empezar rápido)</button>':''}`;
   $('#aNew').onclick=()=>aisleForm(null);const au=$('#aAuto');if(au)au.onclick=()=>{const L=[];for(const[,D]of TREE)for(const[dep,Sb]of D){const cats=[];for(const[,C]of Sb)cats.push(...C);L.push({id:uid(),name:short(dep),desc:dep,active:true,cats,upd:Date.now()});}S.setAisles(L);toast(L.length+' pasillos creados','ok');vAis();};
-  for(const a of A){const on=(p,f)=>{const e=document.getElementById(p+a.id);if(e)e.onclick=f;};
+  $$('[data-aopt]').forEach(e=>e.onclick=()=>aisOpts(e.dataset.aopt));}
+function aisOpts(id){const a=S.aisles().find(x=>x.id===id);if(!a)return;const A=[a];
+  const sh=sheet(`<h2>${esc(a.name)}</h2><div class="sub">${esc(a.desc||'')}${a.desc?' · ':''}${fmt(planOf(a).length)} en el plan · ${a.cats.length} clase(s) · <span class="badge ${a.active===false?'off':''}">${a.active===false?'inactivo':'activo'}</span></div>
+   <div class="card" style="margin-top:10px">${act('📷','g','Escanear este pasillo','','s_'+a.id)}${act('🗂️','y','Asignar productos','Por clase o subdepartamento','p_'+a.id)}${act('📅','b','Días de revisión','Plan por clase y equipo','c_'+a.id)}${act('✏️','v','Editar pasillo','Código, nombre y descripción','e_'+a.id)}
+    ${act(a.active===false?'▶️':'⏸️','o',a.active===false?'Activar':'Desactivar','','t_'+a.id)}${act('🗑️','r','Borrar pasillo','','d_'+a.id,1)}</div>`);
+  const close=()=>sh.remove();
+  for(const a of A){const on=(p,f)=>{const e=sh.querySelector('#'+CSS.escape(p+a.id));if(e)e.onclick=()=>{close();f();};};
     on('s_',()=>go('scan',{aisle:a.id}));on('p_',()=>assign(a.id));on('e_',()=>aisleForm(a.id));on('c_',()=>planSheet(a.id));
     on('t_',()=>{const L=S.aisles();const x=L.find(z=>z.id===a.id);x.active=x.active===false;x.upd=Date.now();S.setAisles(L);vAis();});
     on('d_',()=>{if(!confirm('¿Borrar el pasillo '+a.name+'? Las recorridas anteriores se conservan en el historial.'))return;S.setAisles(S.aisles().filter(z=>z.id!==a.id));vAis();});}}
@@ -840,7 +850,7 @@ function vAv(){const R=avRows(AVD),T=avAgg(R);const SR=semRows(),SM=new Map(SR.m
   const det=(key,inner,head,lvl)=>`<details class="${lvl?'':'card'}" data-avk="${esc(key)}" ${AVO.has(key)?'open':''} style="${lvl?'border-top:1px solid #eef0f2;padding:8px 0 8px '+(lvl*10)+'px':''}"><summary style="list-style:none;cursor:pointer">${head}</summary><div style="margin-top:6px">${inner}</div></details>`;
   $('#main').innerHTML=`<h1>Avance</h1><div class="chips">${[[1,'Hoy'],[7,'Últimos 7 días']].map(([v,l])=>`<button class="chip ${AVD===v?'on':''}" data-avd="${v}">${l}</button>`).join('')}</div>
   <div class="sub" style="margin:6px 2px 10px">Toca una división para ver sus pasillos, y un pasillo para ver sus clases. <b>Cumplimiento</b> = productos exhibidos o repuestos sobre los que debían estar (con stock).</div>
-  ${todayCard()}
+  <div class="card">${act('🕘','b','Historial de recorridas',isAdmin()?'Todas las recorridas, abiertas y cerradas':'Tus recorridas','avHist')}</div>
   <div class="card"><b>🚦 Riesgo ante auditoría</b><div class="sub">Días desde la última revisión de cada clase, según la frecuencia de su pasillo.</div>${semBar(semCnt(SR))}<div style="font-size:13px">${semTxt(semCnt(SR))}</div></div>
   <div class="card">${avHead('Tienda '+HOME_LOCAL,T,1)}</div>
   ${[...g].sort((a,b)=>a[0].localeCompare(b[0])).map(([dv,L])=>{const pa=new Map();for(const x of L){if(!pa.has(x.a.id))pa.set(x.a.id,[]);pa.get(x.a.id).push(x);}
@@ -889,8 +899,9 @@ function vProd(){const uniq=k=>srt(new Set(PR.filter(x=>(!PF.div||k==='div'||x.d
   const run=()=>{const q=PF.q.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();const qs=q.split(/\s+/).filter(Boolean);
     const L=PR.filter(x=>(!PF.est||x.est===PF.est)&&(!PF.stock||(PF.stock==='con'?x.oh>0:PF.stock==='sin'?x.oh===0:x.oh<0))&&['div','dep','sub','cla','marca'].every(k=>!PF[k]||x[k]===PF[k])&&
       (!qs.length||qs.every(w=>(x._s||(x._s=(x.desc+' '+x.marca+' '+x.sku+' '+x.gtin).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''))).includes(w))));
-    $('#pN').textContent=`${fmt(L.length)} resultado(s)${L.length>250?' (mostrando 250 de '+fmt(L.length)+')':''}`;
-    const AS=S.aisles();$('#pL').innerHTML=L.slice(0,250).map(x=>{const na=AS.filter(a=>a.cats.includes(x.cla)).length;return `<div class="card" data-sku="${esc(x.sku)}" style="cursor:pointer;padding:12px"><div style="font-weight:500">${esc(x.desc)}</div>
+    const idle=!qs.length&&!['stock','div','dep','sub','cla','marca'].some(k=>PF[k]);
+    $('#pN').textContent=idle?`${fmt(L.length)} productos. Escribe arriba o usa los filtros para verlos.`:`${fmt(L.length)} resultado(s)${L.length>250?' (mostrando 250 de '+fmt(L.length)+')':''}`;
+    const AS=S.aisles();$('#pL').innerHTML=(idle?[]:L).slice(0,250).map(x=>{const na=AS.filter(a=>a.cats.includes(x.cla)).length;return `<div class="card" data-sku="${esc(x.sku)}" style="cursor:pointer;padding:12px"><div style="font-weight:500">${esc(x.desc)}</div>
       <div class="sub" style="font-size:12px">${esc(x.marca)} · ${esc(x.div)} › ${esc(x.dep)} › ${esc(x.cla)}</div>
       <div class="row" style="margin-top:6px;font-size:12px"><div><div class="sub" style="font-size:10px">CÓDIGO</div>${esc(x.gtin)}</div><div><div class="sub" style="font-size:10px">OH</div><span class="oh ${x.oh>0?'':'z'}">${fmt(x.oh)}</span></div><div><div class="sub" style="font-size:10px">PASILLOS</div><span class="badge ${na?'':'off'}">${na}</span></div><div class="grow"></div>${x.act?'':`<span class="badge off">${esc(x.est)}</span>`}</div></div>`;}).join('');
     $$('#pL [data-sku]').forEach(e=>e.onclick=()=>prodSheet(e.dataset.sku));return L;};
@@ -914,9 +925,13 @@ const negExcl=x=>/CONCESION|OPERADORES/.test(x.cla+' '+x.sub)||/GARANTIA EXTENDI
 const divCode=d=>String(d||'').split('-')[0];
 const RCH1=[['pasillo','Pasillo'],['repo','Reposición'],['rank','Ranking faltantes'],['users','Usuarios'],['dias','Días'],['comp','Comparativa'],['evo','Evolución clase']];
 const RCH2=[['cob','Cobertura stock'],['sinrot','Sin rotación'],['neg','OH negativos'],['camino','En camino'],['sug','Sugeridos'],['valor','Valor stock'],['prov','Proveedores'],['tend','Tendencia clases']];
+const RGRP=[['pis','📷 Pistoleo',RCH1,'Recorridas, faltantes y reposición'],['stk','📦 Stock',RCH2.slice(0,6),'Stock y ventas del reporte GSTPROFUND'],['cat','🏷️ Catálogo',RCH2.slice(6),'Proveedores y tendencia de clases (semanas del reporte)']];
 function vRep(k){if(k)RP=k;const A=S.aisles();if(!RA&&A.length)RA=A[0].id;
   const chips=L=>`<div class="chips">${L.map(([k,l])=>`<button class="chip ${RP===k?'on':''}" data-rp="${k}">${l}</button>`).join('')}</div>`;
-  $('#main').innerHTML=`<h1>Reportes</h1>${chips(RCH1)}<div class="sub" style="margin-top:6px">Catálogo y ventas (${DB.meta.semanas.length} semanas del reporte)</div>${chips(RCH2)}<div id="rBody"></div>`;
+  const G=RGRP.find(g=>g[2].some(([k])=>k===RP))||RGRP[0];
+  $('#main').innerHTML=`<h1>Reportes</h1><div class="seg" style="display:flex;gap:6px;margin:6px 0 4px">${RGRP.map(g=>`<button class="btn sm ${g===G?'pri':''}" data-rg="${g[0]}" style="flex:1">${g[1]}</button>`).join('')}</div>
+   <div class="sub" style="margin:4px 2px">${G[3]}</div>${chips(G[2])}<div id="rBody"></div>`;
+  $$('[data-rg]').forEach(b=>b.onclick=()=>{const g=RGRP.find(x=>x[0]===b.dataset.rg);vRep(g[2][0][0]);});
   $$('[data-rp]').forEach(b=>b.onclick=()=>vRep(b.dataset.rp));repBody();}
 const perSel=()=>`<label class="f">Recorridas de</label><select class="sel" id="rD">${[[1,'Hoy'],[7,'Últimos 7 días'],[30,'Últimos 30 días'],[0,'Todo']].map(([v,l])=>`<option value="${v}" ${RD===v?'selected':''}>${l}</option>`).join('')}</select>`;
 const aisSel=(all)=>`<label class="f">Pasillo</label><select class="sel" id="${all?'rA2':'rA'}">${all?'<option value="">Todos</option>':''}${S.aisles().map(a=>`<option value="${a.id}" ${(all?RA2:RA)===a.id?'selected':''}>${esc(a.name)}</option>`).join('')}</select>`;
