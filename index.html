@@ -128,10 +128,10 @@ table.t td:first-child,table.t th:first-child{text-align:left}
 :root{--nv:#123d2c;--nv2:#1e5a41;--bg:#f4f6f9;--ln:#e3e8ef;--tx:#0f172a;--mut:#64748b;--ok:#0f766e}
 html,body{font-family:Inter,"Segoe UI",Roboto,system-ui,-apple-system,sans-serif;letter-spacing:-.005em}
 header{background:var(--nv);color:#fff;padding:10px 16px 10px}
-header .crumb{color:#a8c5b6;font-weight:600;letter-spacing:.04em;text-transform:uppercase;font-size:11px}
+header .crumb{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;color:#a8c5b6;font-weight:600;letter-spacing:.04em;text-transform:uppercase;font-size:11px}
 header .role{color:#d3e8dc;background:var(--nv2);border-radius:99px;padding:3px 9px;font-weight:700}
 header .out{color:#d3e8dc}
-.hb{background:var(--nv2);border-color:var(--nv2);color:#fff}
+.hb,#hMode,#hSync{white-space:nowrap}.hb{padding:5px 9px;background:var(--nv2);border-color:var(--nv2);color:#fff}
 h1{font-weight:650;font-size:24px;letter-spacing:-.02em}
 h2{font-weight:650}
 .card{border:1px solid var(--ln);box-shadow:none;border-radius:14px}
@@ -833,9 +833,9 @@ function planRec(aid,cls){const a=S.aisles().find(x=>x.id===aid);if(!a)return ch
   const R=S.recs();R.unshift(REC);S.setRecs(R);REC._auto=1;scanUI();}
 const dayN=ts=>{const d=new Date(ts);d.setHours(0,0,0,0);return d.getTime();};
 function ageDays(ts){return Math.round((dayN(Date.now())-dayN(ts))/864e5);}
-function sem(a,r,c){if(!r)return 'r';const pl=KLIM[clsPlan(a,c).k]||KLIM[1],ag=ageDays(r.end);return ag<=pl.g?'g':ag<=pl.lim?'y':'r';}
+function sem(a,r,c){const pa=a.plan&&a.plan.at;if(!r&&!pa)return 'r';const pl=KLIM[clsPlan(a,c).k]||KLIM[1],ag=ageDays(r?r.end:pa);return ag<=pl.g?'g':ag<=pl.lim?'y':'r';}
 const SEMC={g:'#16a34a',y:'#d97706',r:'#dc2626'};
-function semBadge(a,r,c){const s=sem(a,r,c);const txt=r?(ageDays(r.end)===0?'hoy':'hace '+ageDays(r.end)+' d'):'nunca';return `<span style="display:inline-block;min-width:64px;text-align:center;font-size:12px;font-weight:700;color:#fff;background:${SEMC[s]};border-radius:99px;padding:2px 8px">${s==='g'?'●':s==='y'?'▲':'■'} ${txt}</span>`;}
+function semBadge(a,r,c){const s=sem(a,r,c);const txt=r?(ageDays(r.end)===0?'hoy':'hace '+ageDays(r.end)+' d'):(s==='r'?'nunca':'pendiente');return `<span style="display:inline-block;min-width:64px;text-align:center;font-size:12px;font-weight:700;color:#fff;background:${SEMC[s]};border-radius:99px;padding:2px 8px">${s==='g'?'●':s==='y'?'▲':'■'} ${txt}</span>`;}
 function weekTable(){const A=S.aisles().filter(a=>a.active!==false).sort((x,y)=>aNum(x)-aNum(y));const wd=new Date().getDay();
   const cell=(d,tm)=>{const m=new Map();let n=0;for(const a of A)for(const c of a.cats){const k=CLS_CNT.get(c)||0;if(!k)continue;const o=clsPlan(a,c);if((o.t||teamOf(c))!==tm||!o.d.includes(d))continue;n+=k;m.set(a.name,(m.get(a.name)||0)+1);}return {n,m};};
   const lbl=n=>esc(n.replace(/^Pasillo\s*/,'P').replace(/ - .*/,'').replace(/Cajas.*/,'Cajas'));
