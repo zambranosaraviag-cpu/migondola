@@ -676,7 +676,7 @@ function computeFalt(r){const plan=planOf({cats:r.classes});const falt=[];let pr
   falt.sort((a,b)=>a.c.localeCompare(b.c)||b.v-a.v);return {falt,pres,plan:plan.length};}
 function finish(){camOff();const r=REC;Object.assign(r,computeFalt(r));r.end=Date.now();r.open=false;saveRec();result(r);}
 function result(r){const alm=r.falt.filter(f=>f.oh>0),sin=r.falt.filter(f=>f.oh<=0);const scn=Object.keys(r.scans).length;
-  $('#main').innerHTML=`<div class="row" style="margin-bottom:8px"><button class="btn sm" id="rBack">‹ Volver a pasillos</button><div class="grow"></div><button class="btn sm" id="rDel" style="color:var(--red)">🗑 Descartar recorrida</button></div><div class="card" style="background:#f0fdf4">✅ Recorrida de <b>${esc(r.aisleName)}</b>${r.cls?' (solo la clase '+esc(r.cls)+')':''} finalizada.<br>Se detectaron <b>${r.falt.length}</b> producto(s) que faltan exhibir: <b style="color:#e11d48">${alm.length} con stock en almacén (¡a reponer!)</b> y ${sin.length} sin stock.</div>
+  $('#main').innerHTML=`<div class="row" style="margin-bottom:8px"><button class="btn sm" id="rBack">‹ Volver a pasillos</button><div class="grow"></div>${isAdmin()?'<button class="btn sm" id="rDel" style="color:var(--red)">🗑 Descartar recorrida</button>':''}</div><div class="card" style="background:#f0fdf4">✅ Recorrida de <b>${esc(r.aisleName)}</b>${r.cls?' (solo la clase '+esc(r.cls)+')':''} finalizada.<br>Se detectaron <b>${r.falt.length}</b> producto(s) que faltan exhibir: <b style="color:#e11d48">${alm.length} con stock en almacén (¡a reponer!)</b> y ${sin.length} sin stock.</div>
   <div class="kp3"><div class="kpi"><div class="v">${scn}</div><div class="l">presentes</div></div><div class="kpi"><div class="v" style="color:#e11d48">${alm.length}</div><div class="l">en almacén</div></div><div class="kpi"><div class="v" style="color:var(--ora)">${sin.length}</div><div class="l">sin stock</div></div></div>
   <div class="sec">Faltantes — hay que reponer <a id="rCsv">⇣ CSV</a></div>${faltList(alm)}
   ${sin.length?`<details class="card"><summary><b>Sin stock en almacén (${sin.length})</b> <span class="sub">no están en góndola y el sistema tampoco tiene stock: pedir reposición</span></summary>${faltList(sin)}</details>`:''}
@@ -685,7 +685,7 @@ function result(r){const alm=r.falt.filter(f=>f.oh>0),sin=r.falt.filter(f=>f.oh<
   $('#rCont').onclick=()=>go('scan',{rec:r.id});$('#rOther').onclick=()=>{REC=null;go('scan');};$('#rHist').onclick=()=>go('hist');
   $('#rCsv').onclick=()=>csvRec(r);$('#rShare').onclick=()=>shareRec(r);
   $('#rBack').onclick=()=>{REC=null;go('scan');};
-  $('#rDel').onclick=()=>{if(!confirm('¿Descartar esta recorrida? No quedará en el historial.'))return;S.setRecs(S.recs().filter(x=>x.id!==r.id));REC=null;toast('Recorrida descartada');go('scan');};}
+  if($('#rDel'))$('#rDel').onclick=()=>{if(!confirm('¿Descartar esta recorrida? No quedará en el historial.'))return;S.setRecs(S.recs().filter(x=>x.id!==r.id));REC=null;toast('Recorrida descartada');go('scan');};}
 function faltList(L){if(!L.length)return '<div class="empty">Nada por reponer 🎉</div>';let h='',cur=null;const cnt={};L.forEach(f=>cnt[f.c]=(cnt[f.c]||0)+1);
   for(const f of L){if(f.c!==cur){cur=f.c;h+=`<div class="clsH"><span>${esc(cur)}</span><span>${cnt[cur]}</span></div>`;}const x=PR[BYSKU.get(f.s)];
     h+=`<div class="it" data-sku="${esc(f.s)}"><div class="grow"><div class="d">${esc(f.d)}</div><div class="c">${idC(x,f.s)}${f.v?' · vende '+fmt(f.v,1)+' un/día':''}</div></div><span class="oh ${f.oh>0?'':'z'}">OH: ${fmt(f.oh)}</span></div>`;}return h;}
@@ -705,8 +705,9 @@ function vHist(){let R=S.recs();if(!isAdmin())R=R.filter(r=>r.userId===ME.id);
   $('#main').innerHTML=`<h1>Recorridas</h1><div class="chips">${[['todas','Todas'],['abiertas','Abiertas'],['cerradas','Cerradas'],['mias','Solo mías']].map(([k,l])=>`<button class="chip ${HF===k?'on':''}" data-f="${k}">${l}</button>`).join('')}</div>
   ${R.slice(0,150).map(r=>{const a=r.falt.filter(f=>f.oh>0).length;return `<div class="card" data-r="${r.id}" style="cursor:pointer"><div class="row"><div class="grow"><b>${esc(r.aisleName)}</b> <span class="sub">${esc(r.aisleDesc)}</span></div><span class="badge">${Object.keys(r.scans).length} presentes</span></div>
     <div style="margin-top:4px">${r.open?'<span class="badge b">abierta</span>':`<span class="badge r">${a} faltan</span>`} ${r.cls?`<span class="badge o">solo clase ${esc(r.cls)}</span>`:'<span class="badge off">todo el pasillo</span>'}</div>
-    <div class="sub" style="margin-top:4px">${fdt(r.start)} → ${r.end?fdt(r.end):'en curso'} · ${esc(r.userName)}</div></div>`}).join('')||'<div class="card empty">Sin recorridas</div>'}`;
-  $$('[data-f]').forEach(b=>b.onclick=()=>{HF=b.dataset.f;vHist();});$$('[data-r]').forEach(e=>e.onclick=()=>recDetail(e.dataset.r));}
+    <div class="row" style="margin-top:4px"><div class="sub grow">${fdt(r.start)} → ${r.end?fdt(r.end):'en curso'} · ${esc(r.userName)}</div>${isAdmin()?`<button class="btn sm" data-del="${r.id}" style="color:var(--red)">🗑 Eliminar</button>`:''}</div></div>`}).join('')||'<div class="card empty">Sin recorridas</div>'}`;
+  $$('[data-f]').forEach(b=>b.onclick=()=>{HF=b.dataset.f;vHist();});$$('[data-r]').forEach(e=>e.onclick=()=>recDetail(e.dataset.r));
+  $$('[data-del]').forEach(b=>b.onclick=e=>{e.stopPropagation();if(!isAdmin())return;const r=S.recs().find(x=>x.id===b.dataset.del);if(!r||!confirm('¿Eliminar la recorrida de '+r.aisleName+(r.cls?' ('+short(r.cls)+')':'')+' del '+fdt(r.start)+'?'))return;S.setRecs(S.recs().filter(x=>x.id!==r.id));if(REC&&REC.id===r.id)REC=null;toast('Recorrida eliminada','ok');vHist();});}
 function recDetail(id){const r=S.recs().find(x=>x.id===id);if(!r)return;if(r.open){Object.assign(r,computeFalt(r));}
   const alm=r.falt.filter(f=>f.oh>0),sin=r.falt.filter(f=>f.oh<=0);const ks=Object.keys(r.scans);const mine=r.userId===ME.id||isAdmin();
   const sh=sheet(`<h2>${esc(r.aisleName)} <span class="sub">${esc(r.aisleDesc)}</span></h2>
@@ -716,7 +717,7 @@ function recDetail(id){const r=S.recs().find(x=>x.id===id);if(!r)return;if(r.ope
    <div class="sec">Faltan exhibir, en almacén (${alm.length})</div>${faltList(alm)}
    ${sin.length?`<div class="sub" style="margin:8px 2px">+ ${sin.length} faltante(s) sin stock en almacén (OH 0): nada para reponer, no se listan.</div>`:''}
    <div class="sec">Presentes (${ks.length})</div>${ks.map(k=>{const x=PR[BYSKU.get(k)];return `<div class="it"><div class="grow"><div class="d">${esc(x?x.desc:k)}</div><div class="c">${idC(x,k)} · OH ${x?fmt(x.oh):'-'}</div></div></div>`;}).join('')}
-   <div class="row" style="margin-top:14px">${mine?'<button class="btn sm" id="dDel" style="color:var(--red)">🗑 Eliminar esta recorrida</button>':''}<div class="grow"></div><button class="btn sm" id="dCsv">⇣ Exportar CSV</button></div>`);
+   <div class="row" style="margin-top:14px">${isAdmin()?'<button class="btn sm" id="dDel" style="color:var(--red)">🗑 Eliminar esta recorrida</button>':''}<div class="grow"></div><button class="btn sm" id="dCsv">⇣ Exportar CSV</button></div>`);
   const c=sh.querySelector('#dCont');if(c)c.onclick=()=>{sh.remove();go('scan',{rec:r.id});};
   sh.querySelector('#dCsv').onclick=()=>csvRec(r);const dl=sh.querySelector('#dDel');if(dl)dl.onclick=()=>{if(!confirm('¿Eliminar esta recorrida?'))return;S.setRecs(S.recs().filter(x=>x.id!==id));sh.remove();vHist();};}
 
