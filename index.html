@@ -635,7 +635,6 @@ function vMore(){const A=S.aisles().filter(a=>a.active!==false);const L=latestBy
    <div><div class="kpi" style="padding:4px"><div class="v" style="color:var(--g)">${rev}</div><div class="l">Pasillos revisados (7 días)</div></div></div>
    <div><div class="kpi" style="padding:4px"><div class="v" style="color:#e11d48">${pend.length}</div><div class="l">Faltan por exhibir</div></div></div></div>`:''}
   <div class="card">${AD?act('🧮','g','Sanear stock','Pistolea, mira el stock del sistema y anota el conteo físico','mSan'):''}${act('📦','o','Productos','Buscar un producto, su stock y en qué pasillo va','mProd')}
-   ${isAdmin()?'':act('📅','v','Mi calendario de tareas','Qué te toca pistolear cada día de la semana','mWeek')}
    ${act('🕘','b','Historial de recorridas',isAdmin()?'Todas las recorridas':'Tus recorridas','mHist')}
    ${AD?act('🗓️','y','Datos de stock','Reporte del '+esc(((DB.meta.rango||'').match(/al (\S+)/)||[])[1]||'')+' · cargar reporte nuevo','aData'):''}</div>
   ${isAdmin()?`<div class="sec">Administración</div><div class="card">${act('🗓️','v','Plan de la semana','Qué toca cada día por equipo','mWeek')}
