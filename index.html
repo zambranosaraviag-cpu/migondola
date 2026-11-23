@@ -626,10 +626,10 @@ function vScan(o={}){
   const c=$('#sCont');if(c)c.onclick=()=>{REC=open;scanUI();};
   $$('[data-a]').forEach(e=>e.onclick=()=>chooseScope(e.dataset.a));}
 function chooseScope(aid){const a=S.aisles().find(x=>x.id===aid);if(!a){go('scan');return;}
-  const cls=srt(a.cats).filter(c=>CLS_CNT.get(c));const isNF=cls.some(c=>/^J(08|09|10|11)/.test(CLS_DIV.get(c)||''));const subs=new Map();for(const c of cls){const s=CLS_SUB.get(c)||'Otros';if(!subs.has(s))subs.set(s,[]);subs.get(s).push(c);}
+  const cls=srt(a.cats).filter(c=>CLS_CNT.get(c));const isNF=cls.some(c=>/^J(0[3-7]|08|09|10|11)/.test(CLS_DIV.get(c)||''));const subs=new Map();for(const c of cls){const s=CLS_SUB.get(c)||'Otros';if(!subs.has(s))subs.set(s,[]);subs.get(s).push(c);}
   $('#main').innerHTML=`<h1 style="font-size:22px">¿Qué vas a escanear?</h1><div class="sub">${esc(a.name)}${a.desc?' · '+esc(a.desc):''}</div>
   <label class="radio on" id="rAll"><input type="radio" name="sc" checked><div><b>Todo el pasillo</b><div class="sub">${fmt(planOf(a).length)} producto(s) en el plan</div></div></label>
-  ${isNF?`<label class="radio" id="rSub"><input type="radio" name="sc"><div class="grow"><b>Solo un subdepartamento</b><div class="sub">Un grupo de clases, por ejemplo todo Limpieza o todo Juguetes</div>
+  ${isNF?`<label class="radio" id="rSub"><input type="radio" name="sc"><div class="grow"><b>Solo un subdepartamento</b><div class="sub">Un grupo de clases, por ejemplo todo Frutas o todo Juguetes</div>
    <label class="f">Subdepartamento</label><select class="sel" id="sSub" disabled>${[...subs].sort((x,y)=>x[0].localeCompare(y[0])).map(([s,cs])=>`<option value="${esc(s)}">${esc(s)} · ${cs.length} clase(s) · ${fmt(cs.reduce((n,c)=>n+(CLS_CNT.get(c)||0),0))} producto(s)</option>`).join('')}</select></div></label>`:''}
   <label class="radio" id="rOne"><input type="radio" name="sc"><div class="grow"><b>Solo una clase</b><div class="sub">${isNF?'Elige arriba el subdepartamento y aquí salen solo sus clases':'La recorrida compara únicamente esa clase del plan'}</div>
    <label class="f">Clase</label><select class="sel" id="sCls" disabled>${cls.map(c=>`<option value="${esc(c)}">${esc(c)} · ${CLS_CNT.get(c)} producto(s)</option>`).join('')}</select></div></label>
