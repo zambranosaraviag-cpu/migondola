@@ -166,6 +166,7 @@ details.tm>summary{display:flex;align-items:center;gap:10px;padding:11px 2px;cur
 details.tm[open]>summary .chv{transform:rotate(90deg)}.chv{color:#cbd5e1;transition:transform .15s}
 .gauge{width:96px;height:96px;border-radius:50%;display:grid;place-items:center;flex:none}
 .gauge div{width:76px;height:76px;border-radius:50%;background:#fff;display:grid;place-items:center;font-weight:800;font-size:21px}
+.eyew{position:relative}.eyew .inp{padding-right:48px;width:100%}.eyeb{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:transparent;font-size:20px;width:40px;height:40px;cursor:pointer;line-height:1}
 </style>
 </head>
 <body>
@@ -338,9 +339,11 @@ let APPLYING=false,SYNCING=false,SYNC_ERR='';
 async function gzB64(o){const bl=await new Response(new Blob([JSON.stringify(o)]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();const u=new Uint8Array(bl);let s='';for(let i=0;i<u.length;i+=32768)s+=String.fromCharCode.apply(null,u.subarray(i,i+32768));return btoa(s);}
 async function unB64(b){const bin=Uint8Array.from(atob(b),c=>c.charCodeAt(0));return await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).json();}
 async function pushStock(){const url=syncUrl();if(!url||!LS.get('stockPend',0))return;const db=await idbGet('db');if(!db){LS.set('stockPend',0);return;}
-  const upd=LS.get('stockPend');const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({items:[{k:'d',id:'stock',upd,d:await gzB64(db)}]})});const j=await r.json();chkJ(j);
-  LS.set('stockUpd',upd);if(LS.get('stockPend')===upd)LS.set('stockPend',0);}
-async function applyStock(it){if(!it.d||it.upd<=LS.get('stockUpd',0)||LS.get('stockPend',0))return;try{const db=await unB64(it.d);if(!db.products||!db.products.length)return;await idbSet('db',db);setDB(db);LS.set('stockUpd',it.upd);
+  const p0=LS.get('stockPend');const upd=p0;const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({items:[{k:'d',id:'stock',upd,d:await gzB64(db)}]})});const j=await r.json();chkJ(j);
+  LS.set('stockUpd',upd);if(LS.get('stockPend')===p0)LS.set('stockPend',0);}
+const profT=db=>{const f=db&&db.meta&&db.meta.divFecha;const v=f?Object.values(f):[db&&db.meta&&db.meta.fechaImpresion];return Math.min(...v.map(pdF).filter(x=>x>0),9e15);};
+async function applyStock(it,force){if(!it.d)return;const pend=LS.get('stockPend',0);if(!force&&it.upd<=LS.get('stockUpd',0)&&!pend)return;try{const db=await unB64(it.d);if(!db.products||!db.products.length)return;
+  const nT=profT(db),oT=profT(DB);if(nT<oT||(pend&&nT<=oT)||(!force&&nT===oT&&it.upd<=LS.get('stockUpd',0))){LS.set('stockUpd',Math.max(LS.get('stockUpd',0),it.upd));return;}if(pend)LS.set('stockPend',0);await idbSet('db',db);setDB(db);LS.set('stockUpd',it.upd);
   toast('Stock actualizado: '+(((db.meta.rango||'').match(/al (\S+)/)||[])[1]||''),'ok');if(ME&&['home','rep','prod'].includes(VIEW)&&!document.querySelector('.sheet')&&$('#fs').classList.contains('hide'))go(VIEW);}catch(e){}}
 function track(k,prev,next){if(APPLYING||!syncUrl())return;const D=LS.get('dirty',{});const pm=new Map(prev.map(x=>[x.id,JSON.stringify(x)]));const nm=new Set();
   for(const x of next){nm.add(x.id);if(pm.get(x.id)!==JSON.stringify(x)){x.upd=Math.max(Date.now(),(x.upd||0)+1);D[k+'|'+x.id]={k,id:x.id,upd:x.upd,d:x};}}
@@ -348,12 +351,17 @@ function track(k,prev,next){if(APPLYING||!syncUrl())return;const D=LS.get('dirty
 function syncBadge(){const e=$('#hSync');if(!e)return;if(!syncUrl()){e.textContent='';return;}const n=Object.keys(LS.get('dirty',{})).length;
   e.textContent=SYNC_ERR?'☁️✕':n?'☁️ '+n:'☁️✓';e.title=SYNC_ERR||(n?n+' cambio(s) por subir':'Sincronizado');e.style.color=SYNC_ERR?'var(--red)':n?'var(--amb)':'var(--g)';}
 function chkJ(j){if(!j.ok)throw new Error(j.error==='clave'?'clave incorrecta: abre el link nuevo que te pasó tu administrador':'error del servidor');}
+async function pullStock(){const url=syncUrl();if(!url)return toast('Sin conexión con la hoja','err');toast('Buscando la PROF en la hoja…','ok',4000);
+  try{const r=await fetch(url+(url.includes('?')?'&':'?')+'since=0');const j=await r.json();chkJ(j);const st=(j.items||[]).filter(x=>x.k==='d'&&x.id==='stock').sort((a,b)=>b.upd-a.upd)[0];
+    const before=profT(DB);if(st)await applyStock(st,true);applyRemote((j.items||[]).filter(x=>x.k!=='d'));LS.set('synced',1);if(profT(DB)<=before)toast('La hoja no tiene una PROF más nueva. Pide al admin que la cargue.','err',5000);go(VIEW);}catch(e){toast('No se pudo: '+e.message,'err');}}
+document.addEventListener('click',e=>{if(e.target.closest('[data-pull]'))pullStock();});
 async function syncNow(){const url=syncUrl();if(!url||SYNCING)return;SYNCING=true;
-  try{await pushStock();const D=LS.get('dirty',{});const keys=Object.keys(D).slice(0,40);
+  try{let stErr='';try{await pushStock();}catch(e){stErr=e.message;console.log('stock',e);}const D=LS.get('dirty',{});const keys=Object.keys(D).slice(0,40);
     if(keys.length){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({items:keys.map(k=>D[k])})});const j=await r.json();chkJ(j);
       const D2=LS.get('dirty',{});for(const k of keys)if(D2[k]&&D2[k].upd===D[k].upd)delete D2[k];LS.set('dirty',D2);}
-    const since=LS.get('syncSince',0);const r=await fetch(url+(url.includes('?')?'&':'?')+'since='+since);const j=await r.json();chkJ(j);
-    if(j.items.length)applyRemote(j.items);LS.set('syncSince',Math.max(0,j.now-120000));SYNC_ERR='';
+    let since=LS.get('syncSince',0);const pi=profInfo();if(pi&&pi.age>=1&&Date.now()-LS.get('stkChk',0)>3e5){LS.set('stkChk',Date.now());since=Math.min(since,Math.max(0,LS.get('stockUpd',0)-1));}
+    const r=await fetch(url+(url.includes('?')?'&':'?')+'since='+since);const j=await r.json();chkJ(j);
+    if(j.items.length)applyRemote(j.items);LS.set('syncSince',Math.max(LS.get('syncSince',0),j.now-600000));SYNC_ERR=stErr?'No se pudo subir la PROF: '+stErr:'';LS.set('synced',1);
     if(Object.keys(LS.get('dirty',{})).length)setTimeout(syncNow,500);
   }catch(e){SYNC_ERR='Sin conexión con la hoja: '+e.message;}finally{SYNCING=false;syncBadge();}}
 function applyRemote(items){const st=items.filter(x=>x.k==='d'&&x.id==='stock').sort((a,b)=>b.upd-a.upd)[0];if(st)applyStock(st);const D=LS.get('dirty',{});let ch=false;APPLYING=true;
@@ -390,20 +398,20 @@ function pdF(s){const m=String(s||'').match(/(\d{1,2})-(\d{1,2})-0?(\d{2,4})/);i
 function profBanner(){const p=profInfo();if(!p)return '';const OLD=profOld();
   if(p.age<1&&OLD.length)return `<div class="card" style="background:#fef3c7;border:1px solid #fcd34d;color:#92400e"><b>⚠️ PROF de hoy cargada solo en parte</b><div style="font-size:13px;margin-top:4px">Siguen con la PROF anterior: <b>${OLD.join(', ')}</b>.${isAdmin()?' Carga esos archivos para tener todo al día.':''}</div>${isAdmin()?'<button class="btn pri sm" data-profimp="1" style="margin-top:10px">⇡ Cargar las que faltan</button>':''}</div>`;
   if(p.age<1)return `<div class="sub" style="margin:2px 2px 8px;color:var(--g)">📦 PROF del ${p.txt} (hoy) ✓</div>`;
-  return `<div class="card" style="background:#fee2e2;border:1px solid #fca5a5;color:#991b1b"><b>⚠️ La PROF es del ${p.txt}${p.age>1?' (hace '+p.age+' días)':' (de ayer)'}</b><div style="font-size:13px;margin-top:4px">${isAdmin()?'Carga la de hoy para que el OH esté al día.':'El stock puede no estar al día. Avísale a tu administrador que cargue la PROF de hoy.'}</div>${isAdmin()?'<button class="btn pri sm" data-profimp="1" style="margin-top:10px">⇡ Cargar PROF de hoy</button>':''}</div>`;}
+  return `<div class="card" style="background:#fee2e2;border:1px solid #fca5a5;color:#991b1b"><b>⚠️ La PROF es del ${p.txt}${p.age>1?' (hace '+p.age+' días)':' (de ayer)'}</b><div style="font-size:13px;margin-top:4px">${isAdmin()?'Carga la de hoy para que el OH esté al día.':'El stock puede no estar al día. Avísale a tu administrador que cargue la PROF de hoy.'}</div><div class="row" style="gap:6px;flex-wrap:wrap;margin-top:10px"><button class="btn sm ${isAdmin()?'':'pri'}" data-pull="1">↻ Buscar PROF nueva</button>${isAdmin()?'<button class="btn pri sm" data-profimp="1">⇡ Cargar PROF de hoy</button>':''}</div></div>`;}
 document.addEventListener('click',e=>{if(!e.target.closest('[data-profimp]'))return;dataSheet();const b=$('#dImp');if(b)b.click();});
 function planOf(a,cls){const set=new Set(cls?[cls]:a.cats);return PR.filter(x=>x.act&&set.has(x.cla));}
 function aisleOfClass(c){return S.aisles().filter(a=>a.active!==false&&a.cats.includes(c));}
 
 /* ================= navegación ================= */
 let VIEW='home';
-const NAVOF={hist:'av',prod:'more',ais:'more',users:'more'};
+const NAVOF={hist:'av',prod:'more',ais:'more',users:'more',san:'more'};
 const TITLES={more:'Más',qhome:'Calidad',qscan:'Revisar fechas',qalert:'Alertas de retiro',qhist:'Historial calidad',mode:'MiGondola',home:'Inicio',scan:'Escanear',hist:'Historial',av:'Avance',rep:'Reportes',prod:'Productos',ais:'Pasillos',users:'Usuarios'};
 let HSTK=[],GARGS=[],GBACK=false;
 function goBack(){if(VIEW==='scan'&&!REC&&!/¿Qué pasillo/.test($('#main').textContent)||VIEW==='scan'&&REC&&!REC.open){REC=null;GBACK=true;go('scan');GBACK=false;return;}const h=HSTK.pop();GBACK=true;if(h)go(h[0],...h[1]);else go(MODE==='cal'?'qhome':'home');GBACK=false;}
 function go(v,...args){if(!GBACK&&VIEW&&!(VIEW===v&&!args.length&&!GARGS.length)&&VIEW!=='mode'){HSTK.push([VIEW,GARGS]);if(HSTK.length>30)HSTK.shift();}if(v==='mode')HSTK=[];GARGS=args.filter(a=>typeof a!=='object'||(a&&!a.rec&&!a.aisle));if((VIEW==='scan'||VIEW==='qscan')&&v!==VIEW)camOff();$$('#navQ button').forEach(b=>b.classList.toggle('on',b.dataset.q===v));$('#fs').classList.add('hide');$('#toasts').innerHTML='';VIEW=v;const nv=NAVOF[v]||v;$$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===nv));
   $('#hBack').classList.toggle('hide',['home','qhome','mode'].includes(v));$('#crumb').textContent=TITLES[v]||'MiGondola';document.title='MiGondola — '+(TITLES[v]||'');window.scrollTo(0,0);
-  ({mode:vMode,qhome:vQHome,qscan:vQScan,qalert:vQAlert,qhist:vQHist,home:vHome,scan:vScan,hist:vHist,av:vAv,rep:vRep,prod:vProd,ais:vAis,users:vUsers,more:vMore})[v](...args);}
+  ({mode:vMode,qhome:vQHome,qscan:vQScan,qalert:vQAlert,qhist:vQHist,home:vHome,scan:vScan,hist:vHist,av:vAv,rep:vRep,prod:vProd,san:vSan,ais:vAis,users:vUsers,more:vMore})[v](...args);}
 document.addEventListener('click',e=>{if(e.target.closest('#avHist'))go('hist');});
 $$('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));$$('#navQ button').forEach(b=>b.onclick=()=>{if(b.dataset.q==='qscan'&&QREV&&QREV.open){qScanUI();return;}go(b.dataset.q);});$('#hMode').onclick=()=>{camOff();go('mode');};$('#hBack').onclick=()=>{camOff();goBack();};
 $('#hOut').onclick=()=>{camOff();$('#fs').classList.add('hide');ME=null;LS.set('me',null);showLogin();};
@@ -560,7 +568,7 @@ function vQHist(){const R=QS.revs().filter(r=>isAdmin()||r.userId===ME.id).slice
   $$('[data-qh]').forEach(e=>e.onclick=()=>{const r=R.find(x=>x.id===e.dataset.qh);const ls=QS.lots().filter(l=>l.revId===r.id);
     const sh=sheet(`<h2>${esc(r.aisleName)}</h2><div class="sub">${esc(r.userName)} · ${fdt(r.start)}${r.end?' a '+fdt(r.end):''}</div><div class="sec">Fechas cortas cargadas (${ls.length})</div>${ls.map(l=>lotRow(l,false)).join('')||'<div class="empty">Ninguna</div>'}
      ${r.open&&r.userId===ME.id?'<button class="btn pri big" id="hq">📷 Seguir revisando</button>':''}`);const b=sh.querySelector('#hq');if(b)b.onclick=()=>{sh.remove();QREV=r;qScanUI();};});}
-function codeIn(c){if(MODE==='cal'&&QREV&&VIEW==='qscan')qCode(c);else scanCode(c);}
+function codeIn(c){if(VIEW==='san')sanCode(String(c).trim());else if(MODE==='cal'&&QREV&&VIEW==='qscan')qCode(c);else scanCode(c);}
 /* ================= AJUSTES DE STOCK (conteo físico) ================= */
 const AJ={all:()=>LS.get('adjs',[]),set:l=>{l=l.slice(0,3000);track('j',AJ.all(),l);LS.set('adjs',l);}};
 function adjBlock(x){const p=AJ.all().find(a=>a.sku===x.sku&&!a.done);
@@ -583,6 +591,10 @@ function adjSheet(){const L=AJ.all();const P=L.filter(a=>!a.done),D=L.filter(a=>
   sh.querySelectorAll('[data-ajdel]').forEach(b=>b.onclick=()=>{if(!confirm('¿Borrar este conteo?'))return;AJ.set(AJ.all().filter(a=>a.id!==b.dataset.ajdel));sh.remove();adjSheet();});
   const c=sh.querySelector('#ajCsv');if(c)c.onclick=()=>csvDownload('ajustes_stock_'+HOME_LOCAL+'_'+dayStr(Date.now())+'.csv',[['Local','SKU','GTIN','Descripcion','Clase','Pasillo','OH sistema','Stock fisico','Diferencia','Usuario','Fecha'],...P.map(a=>[HOME_LOCAL,a.sku,a.gtin,a.desc,a.cla,a.aisle,a.oh,a.fis,a.fis-a.oh,a.userName,fdt(a.ts)])]);
   const dn=sh.querySelector('#ajDone');if(dn)dn.onclick=()=>{if(!confirm('¿Marcar los '+P.length+' conteos como ya ajustados en el sistema?'))return;const now=Date.now();AJ.set(AJ.all().map(a=>a.done?a:Object.assign(a,{done:true,doneAt:now,doneBy:ME.name,upd:now})));sh.remove();toast('Marcados como ajustados','ok');};}
+// ojito para ver la contraseña
+function eyeify(root){(root||document).querySelectorAll('input[type=password]:not([data-eyed])').forEach(i=>{i.dataset.eyed=1;const w=document.createElement('div');w.className='eyew';i.parentNode.insertBefore(w,i);w.appendChild(i);
+  const b=document.createElement('button');b.type='button';b.className='eyeb';b.setAttribute('aria-label','Mostrar contraseña');b.textContent='👁';b.onclick=e=>{e.preventDefault();const sh=i.type==='password';i.type=sh?'text':'password';b.textContent=sh?'🙈':'👁';b.setAttribute('aria-label',sh?'Ocultar contraseña':'Mostrar contraseña');i.focus();};w.appendChild(b);});}
+new MutationObserver(()=>eyeify()).observe(document.body,{childList:true,subtree:true});eyeify();
 function copyTxt(s){const ok=()=>toast('SKU '+s+' copiado','ok',1500);if(navigator.clipboard&&isSecureContext)navigator.clipboard.writeText(s).then(ok,()=>fb());else fb();
   function fb(){const a=document.createElement('textarea');a.value=s;a.style.position='fixed';a.style.opacity='0';document.body.appendChild(a);a.select();try{document.execCommand('copy');ok();}catch(e){toast('No se pudo copiar','err');}a.remove();}}
 document.addEventListener('click',e=>{const c=e.target.closest('[data-cp]');if(!c)return;e.stopPropagation();e.preventDefault();copyTxt(c.dataset.cp);},true);
@@ -597,11 +609,11 @@ function vHome(){const A=S.aisles().filter(a=>a.active!==false);const L=latestBy
   ${open.length?`<div class="sec">Recorridas abiertas (${open.length})</div><div class="card" style="border:1px solid var(--amb);padding:4px 14px">${open.map(r=>`<div class="act" data-cont="${r.id}"><div class="ic y">📷</div><div class="grow"><div class="t">${esc(r.aisleName.replace(/ - .*/,''))}${r.cls?' · '+esc(recLbl(r)):''}</div><div class="s">${Object.keys(r.scans).length} escaneados · desde ${fdt(r.start)}</div></div><button class="btn pri sm" style="flex:none">Seguir</button></div>`).join('')}</div>`:''}
   <div class="sec">Reposición pendiente ${pend.length?'<a id="hCsv">⇣ CSV</a>':''}</div>
   <div class="card">${pend.length?[...byA].sort((a,b)=>b[1]-a[1]).map(([n,c])=>`<div class="act" data-pa="${esc(n)}"><div class="ic o">📦</div><div class="grow"><div class="t">${esc(n)}</div><div class="s">${c} producto(s) con stock en almacén para subir a góndola</div></div><div class="ch">›</div></div>`).join(''):'<div class="empty">Sin reposición pendiente. Escanea un pasillo para ver qué falta exhibir.</div>'}</div>
-  <div class="card">${act('📝','b','Ajustes de stock',(AJ.all().filter(a=>!a.done).length||'Sin')+' conteo(s) físico(s) pendiente(s) · exportar para ajustar','aAdj')}</div>`;
+  <div class="card">${act('🧮','g','Sanear stock','Ver stock del sistema y anotar el conteo físico','hSan')}${act('📝','b','Ajustes de stock',(AJ.all().filter(a=>!a.done).length||'Sin')+' conteo(s) físico(s) pendiente(s) · exportar para ajustar','aAdj')}</div>`;
   $$('[data-cont]').forEach(e=>e.onclick=()=>go('scan',{rec:e.dataset.cont}));
   const cs=$('#hCsv');if(cs)cs.onclick=()=>csvPending(pend);
   $$('[data-pa]').forEach(e=>e.onclick=()=>go('rep','repo'));
-  $('#aAdj').onclick=adjSheet;}
+  $('#aAdj').onclick=adjSheet;$('#hSan').onclick=()=>go('san');}
 function vMore(){const A=S.aisles().filter(a=>a.active!==false);const L=latestByClass(7);const rev=new Set([...L.values()].map(r=>r.aisleId)).size;const pend=pending(7);
   $('#main').innerHTML=`<h1>Más</h1>
   <div class="sec">Resumen</div>
@@ -609,7 +621,7 @@ function vMore(){const A=S.aisles().filter(a=>a.active!==false);const L=latestBy
    <div><div class="kpi" style="padding:4px"><div class="v">${A.length}</div><div class="l">Pasillos activos</div></div></div>
    <div><div class="kpi" style="padding:4px"><div class="v" style="color:var(--g)">${rev}</div><div class="l">Pasillos revisados (7 días)</div></div></div>
    <div><div class="kpi" style="padding:4px"><div class="v" style="color:#e11d48">${pend.length}</div><div class="l">Faltan por exhibir</div></div></div></div>
-  <div class="card">${act('📦','o','Productos','Buscar un producto, su stock y en qué pasillo va','mProd')}
+  <div class="card">${act('🧮','g','Sanear stock','Pistolea, mira el stock del sistema y anota el conteo físico','mSan')}${act('📦','o','Productos','Buscar un producto, su stock y en qué pasillo va','mProd')}
    ${act('🕘','b','Historial de recorridas',isAdmin()?'Todas las recorridas':'Tus recorridas','mHist')}
    ${act('🗓️','v','Plan de la semana','Qué toca cada día por equipo','mWeek')}
    ${act('🗓️','y','Datos de stock','Reporte del '+esc(((DB.meta.rango||'').match(/al (\S+)/)||[])[1]||'')+(isAdmin()?' · cargar reporte nuevo':''),'aData')}</div>
@@ -617,7 +629,7 @@ function vMore(){const A=S.aisles().filter(a=>a.active!==false);const L=latestBy
    ${act('👥','b','Usuarios','Altas, roles, contraseñas y pasillos asignados','aUsers')}
    ${act('☁️','g','Sincronización',syncUrl()?(SYNC_ERR?'Sin conexión con la hoja':'Activada con Google Sheets'):'Desactivada · conectar con Google Sheets','aSy')}
    ${act('🔄','v','Compartir datos por archivo','Exportar o importar pasillos, usuarios y recorridas','aBk')}</div>`:''}`;
-  $('#mProd').onclick=()=>go('prod');$('#mHist').onclick=()=>go('hist');$('#mWeek').onclick=()=>{const sh=sheet(weekTable());sh.querySelectorAll('.card').forEach(c=>c.style.boxShadow='none');};$('#aData').onclick=dataSheet;
+  $('#mProd').onclick=()=>go('prod');$('#mSan').onclick=()=>go('san');$('#mHist').onclick=()=>go('hist');$('#mWeek').onclick=()=>{const sh=sheet(weekTable());sh.querySelectorAll('.card').forEach(c=>c.style.boxShadow='none');};$('#aData').onclick=dataSheet;
   const on=(id,f)=>{const e=$('#'+id);if(e)e.onclick=f;};on('mAis',()=>go('ais'));on('aUsers',()=>go('users'));on('aBk',backupSheet);on('aSy',syncSheet);}
 function csvPending(pend){csvDownload('reposicion_pendiente.csv',[['Pasillo','Clase','SKU','GTIN','Descripcion','OH','Recorrida','Usuario'],...pend.map(p=>{const x=PR[BYSKU.get(p.f.s)]||{};return [p.a.name,short(p.c),p.f.s,x.gtin||'',p.f.d,p.f.oh,fdt(p.r.end),p.r.userName];})]);}
 function dataSheet(){const fi=(DB.meta.fechaImpresion||'');
@@ -843,7 +855,7 @@ function genPlan(){const AL=S.aisles();const LD={};const ld=(tm,d)=>LD[tm+'|'+d]
   S.setAisles(AL);}
 function clsPlan(a,c){const o=a.plan&&a.plan.cls&&a.plan.cls[c];return o||{k:1,d:[],w:null};}
 function todayHas(a,c,ts){const o=clsPlan(a,c);if(o.k===0)return false;const d=new Date(ts||Date.now()).getDay();return o.d.includes(d)&&(o.w==null||o.w===wkPar(ts||Date.now()));}
-function ensurePlan(){try{if(!ME||!isAdmin()||!PR.length)return;const A=S.aisles();if(!A.length||A.some(a=>a.plan&&a.plan.v===10))return;genPlan();}catch(e){console.log(e);}}
+function ensurePlan(){try{if(!ME||!isAdmin()||!PR.length)return;if(syncUrl()&&!LS.get('synced',0))return;const A=S.aisles();if(!A.length||A.some(a=>a.plan&&a.plan.v===10))return;genPlan();}catch(e){console.log(e);}}
 setTimeout(ensurePlan,8000);setInterval(ensurePlan,300000);document.addEventListener('click',e=>{const b=e.target.closest('[data-goa]');if(b)go('scan',b.dataset.gcl?{aisle:b.dataset.goa,plan:b.dataset.gcl.split('|')}:{aisle:b.dataset.goa});});
 // recorrida directa con las clases que tocan (desde Inicio)
 // título corto de una recorrida (sin listar 24 clases)
@@ -1021,6 +1033,51 @@ function prodSheet(sku){const x=PR[BYSKU.get(sku)];if(!x)return;const AS=S.aisle
    <div class="kpi"><div class="l">Venta por día</div><div class="v">${fmt(x.vel,1)}</div></div><div class="kpi"><div class="l">Precio</div><div class="v">S/ ${fmt(x.pv,2)}</div></div></div>${adjBlock(x)}
   <div class="card"><b>Ventas por semana</b><table class="t">${x.w.map((v,i)=>`<tr><td>${esc(DB.meta.semanas[i]||'S'+(i+1))}${i===4?' (incompleta)':''}</td><td>${fmt(v)}</td></tr>`).join('')}</table></div>
   <div class="card sub">${esc(x.div)} › ${esc(x.dep)} › ${esc(x.sub)} › ${esc(x.cla)}<br>Proveedor: ${esc(x.prov)}<br>Pasillo(s): ${AS.map(a=>esc(a.name)).join(', ')||'sin asignar'}</div>`);}
+
+/* ================= SANEAR STOCK ================= */
+let SNX=null,SNL='',SNQ='';
+const snNeg=()=>PR.filter(x=>x.oh<0&&!negExcl(x)).sort((a,b)=>a.oh-b.oh);
+const snFal=()=>{const m=new Map();for(const p of pending(7)){const x=PR[BYSKU.get(p.f.s)];if(x&&!m.has(x.sku))m.set(x.sku,x);}return [...m.values()].sort((a,b)=>b.oh-a.oh);};
+function snRow(x){const p=AJ.all().find(a=>a.sku===x.sku&&!a.done);return `<div class="it" data-snsku="${esc(x.sku)}" style="cursor:pointer"><div class="grow"><div class="d">${esc(x.desc)}</div><div class="c">${esc(x.marca)} · SKU ${esc(x.sku)} · ${esc(short(x.cla))}</div></div><div style="text-align:right;font-size:12px;flex:none">sistema<br><b style="font-size:15px;color:${x.oh<0?'var(--red)':'inherit'}">${fmt(x.oh)}</b>${p?`<br><span style="color:var(--blu)">contado ${fmt(p.fis)}</span>`:''}</div></div>`;}
+function vSan(){const x=SNX?PR[BYSKU.get(SNX)]:null;const neg=snNeg(),fal=snFal();
+  const today=dayN(Date.now());const HOY=AJ.all().filter(a=>dayN(a.ts)===today);
+  let list='';
+  if(!x&&SNQ){const qs=SNQ.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').split(/\s+/).filter(Boolean);
+    const L=PR.filter(y=>{const s=(y.desc+' '+y.marca+' '+y.sku+' '+y.gtin).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');return qs.every(q=>s.includes(q));}).slice(0,40);
+    list=`<div class="sec">Resultados (${L.length}${L.length===40?'+':''})</div><div class="card" style="padding:4px 12px">${L.map(snRow).join('')||'<div class="empty">No se encontró. Revisa el código o el nombre.</div>'}</div>`;}
+  else if(!x&&SNL){const L=SNL==='neg'?neg:fal;
+    list=`<div class="sec">${SNL==='neg'?'Stock negativo':'Con stock pero no encontrados en góndola'} (${L.length})</div><div class="card" style="padding:4px 12px">${L.slice(0,150).map(snRow).join('')||'<div class="empty">Nada por sanear aquí ✓</div>'}</div>${L.length>150?'<div class="sub">Se muestran los primeros 150.</div>':''}`;}
+  const pend=x&&AJ.all().find(a=>a.sku===x.sku&&!a.done);const AS=x?S.aisles().filter(a=>a.cats.includes(x.cla)).map(a=>a.name.replace(/ - .*/,'')):[];
+  $('#main').innerHTML=`<h1>🧮 Sanear stock</h1><div class="sub" style="margin:0 2px 10px">Pistolea o escribe el producto, mira su stock en el sistema y anota lo que cuentas en tienda. Lo que no cuadra va a Ajustes de stock.</div>
+  <div class="row" style="gap:6px"><input class="inp grow" id="snQ" placeholder="🔍 Código de barras, SKU o nombre" value="${esc(SNQ)}" autocomplete="off"><button class="btn pri" id="snCam" style="flex:none">📷</button></div>
+  ${x?`<div class="card" style="margin-top:10px;border:1px solid #bbf7d0">
+    <div class="row" style="align-items:flex-start"><div class="grow"><b style="font-size:16px">${esc(x.desc)}</b><div class="sub">${esc(x.marca)} · <span data-cp="${esc(x.sku)}" style="display:inline-block;background:#dcfce7;color:#14532d;border-radius:6px;padding:1px 6px;font-weight:700;cursor:pointer">SKU ${esc(x.sku)} 📋</span> · GTIN ${esc(x.gtin)}</div><div class="sub" style="font-size:12px">${esc(short(x.cla))} · ${AS.length?esc(AS.join(', ')):'sin pasillo'} · ${esc(x.est)}</div></div><button class="btn sm" id="snX" style="flex:none">✕</button></div>
+    <div class="kp" style="margin-top:10px"><div class="kpi"><div class="l">Stock sistema (OH)</div><div class="v" style="font-size:28px;color:${x.oh<0?'var(--red)':x.oh===0?'var(--mut)':'inherit'}">${fmt(x.oh)}</div></div><div class="kpi"><div class="l">En camino (OO)</div><div class="v">${fmt(x.oo)}</div></div><div class="kpi"><div class="l">Venta por día</div><div class="v">${fmt(x.vel,1)}</div></div><div class="kpi"><div class="l">PROF del</div><div class="v" style="font-size:15px">${esc(((DB.meta.divFecha||{})[divCode(x.div)]||DB.meta.fechaImpresion||'').split(' ')[0]||'—')}</div></div></div>
+    ${pend?`<div class="sub" style="margin-top:8px;color:var(--blu)">Ya contado: <b>${fmt(pend.fis)}</b> por ${esc(pend.userName)} ${fdt(pend.ts)} (pendiente de ajuste)</div>`:''}
+    <label class="f" style="margin-top:10px">Stock físico contado</label>
+    <div class="row" style="gap:6px"><input class="inp grow" id="snF" inputmode="numeric" placeholder="Cantidad que hay en tienda" value="${pend?pend.fis:''}" style="font-size:20px;font-weight:700"><button class="btn pri" id="snOk" style="flex:none">Guardar</button></div>
+    <div id="snD" class="sub" style="margin-top:6px;min-height:18px"></div>
+    <button class="btn" id="snEq" style="width:100%;margin-top:6px">✓ Cuadra con el sistema (${fmt(x.oh)})</button></div>`:''}
+  ${list}
+  ${!x&&!SNQ?`<div class="sec">Para sanear</div><div class="card">
+    ${act('🔻','r','Stock negativo',fmt(neg.length)+' producto(s) con OH menor a 0','snNeg')}
+    ${act('👻','o','Con stock y no encontrados',fmt(fal.length)+' producto(s) que el sistema dice que hay pero no se pistolearon en góndola (últimos 7 días)','snFal')}</div>`:''}
+  <div class="sec">Contados hoy (${HOY.length})</div><div class="card" style="padding:4px 12px">${HOY.slice(0,30).map(a=>{const d=a.fis-a.oh;return `<div class="it" data-snsku="${esc(a.sku)}" style="cursor:pointer"><div class="grow"><div class="d">${esc(a.desc)}</div><div class="c">${esc(a.userName)} · ${fdt(a.ts)}${a.done?' · ajustado':''}</div></div><div style="text-align:right;font-size:12px;flex:none">sist. ${fmt(a.oh)} · fís. <b>${fmt(a.fis)}</b><br><b style="color:${d===0?'var(--mut)':d>0?'var(--g)':'var(--red)'}">${d>0?'+':''}${fmt(d)}</b></div></div>`;}).join('')||'<div class="empty">Aún no hay conteos hoy.</div>'}</div>
+  <div class="card">${act('📝','b','Ajustes de stock',(AJ.all().filter(a=>!a.done).length||'Sin')+' conteo(s) pendiente(s) · exportar para ajustar en el sistema','snAdj')}</div>`;
+  const q=$('#snQ');q.onkeydown=e=>{if(e.key==='Enter'){sanCode(q.value.trim());}};q.oninput=()=>{clearTimeout(q._t);q._t=setTimeout(()=>{const v=q.value.trim();if(/^\d{6,}$/.test(v))return;SNQ=v;SNX=null;SNL='';vSan();const n=$('#snQ');n.focus();n.setSelectionRange(n.value.length,n.value.length);},450);};
+  $('#snCam').onclick=camOnF;
+  $$('[data-snsku]').forEach(e=>e.onclick=()=>{SNX=e.dataset.snsku;SNQ='';vSan();scrollTo(0,0);});
+  const ng=$('#snNeg');if(ng)ng.onclick=()=>{SNL='neg';vSan();};const fl=$('#snFal');if(fl)fl.onclick=()=>{SNL='fal';vSan();};
+  $('#snAdj').onclick=adjSheet;
+  if(x){$('#snX').onclick=()=>{SNX=null;vSan();};const f=$('#snF'),d=$('#snD');const upd=()=>{const v=f.value.trim();if(v===''||isNaN(+v)){d.innerHTML='';return;}const df=+v-x.oh;d.innerHTML=df===0?'<b style="color:var(--g)">Cuadra ✓</b>':`Diferencia: <b style="color:${df>0?'var(--g)':'var(--red)'}">${df>0?'+':''}${fmt(df)}</b> · se mandará a ajuste`;};f.oninput=upd;upd();
+    f.onkeydown=e=>{if(e.key==='Enter')$('#snOk').click();};
+    $('#snOk').onclick=()=>{const v=f.value.trim();if(v!==''&&+v===x.oh){snEq(x);return;}if(adjSave(x.sku,v)){SNX=null;vSan();setTimeout(()=>{const n=$('#snQ');if(n)n.focus();},50);}};
+    $('#snEq').onclick=()=>snEq(x);if(!pend)setTimeout(()=>f.focus(),50);}
+  else setTimeout(()=>{if(!SNQ&&!SNL)q.focus();},50);}
+function snEq(x){const L=AJ.all().filter(a=>!(a.sku===x.sku&&!a.done));const as=S.aisles().filter(a=>a.cats.includes(x.cla)).map(a=>a.name).join(', ');
+  L.unshift({id:uid(),sku:x.sku,gtin:x.gtin,desc:x.desc,cla:x.cla,aisle:as,oh:x.oh,fis:x.oh,userId:ME.id,userName:ME.name,ts:Date.now(),done:true,doneAt:Date.now(),doneBy:'cuadra',upd:Date.now()});AJ.set(L);
+  toast(x.desc.slice(0,28)+': cuadra ✓','ok');SNX=null;vSan();setTimeout(()=>{const n=$('#snQ');if(n)n.focus();},50);}
+function sanCode(c){if(!c)return;const x=findCode(c);if(x){SNX=x.sku;SNQ='';SNL='';if(camRun)fsClose();vSan();scrollTo(0,0);try{beep(1000);}catch(e){}}else{const isNum=/^\d+$/.test(c);if(isNum){toast('Código '+c+' no está en la PROF','err');}else{SNQ=c;SNX=null;vSan();}}}
 
 /* ================= REPORTES ================= */
 let RP='pasillo',RA='',RD=7,RC='',RA2='',RDV=[];
