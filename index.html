@@ -481,7 +481,15 @@ const QS={lots:()=>LS.get('lots',[]),setLots:l=>{track('l',QS.lots(),l);LS.set('
 const dayStr=d=>{const x=new Date(d);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');};
 const daysTo=fv=>{const [y,m,d]=fv.split('-').map(Number);const t=new Date();t.setHours(0,0,0,0);return Math.round((new Date(y,m-1,d)-t)/864e5);};
 const fdate=fv=>{const [y,m,d]=fv.split('-');return d+'/'+m+'/'+y;};
-function lotState(l){const c=QS.cfg(),n=daysTo(l.fv);if(l.status==='retirado')return 'ret';if(n<0)return 'venc';if(n<=c.ant)return 'retirar';if(n<=c.ant+c.prox)return 'prox';return 'ok';}
+const VIDA=[['20','Menor o igual a 20 días',1],['60','Más de 20 días hasta 2 meses',3],['180','Más de 2 meses hasta 6 meses',7],['mas','Más de 6 meses',15]];
+function retRule(cla,div){cla=String(cla||'');div=String(div||cla);
+  if(/^J01010708/.test(cla))return [3,'Panadería industrial/bizcochos'];if(/^J050102/.test(cla))return [5,'Huevos frescos'];
+  if(/^J02010103/.test(cla))return [15,'Cloro/lejías'];if(/^J020301/.test(cla))return [15,'Alimentos para mascotas'];
+  if(/^J02/.test(cla))return [30,'PGC no comestible'];if(/^J(08|09|10|11)/.test(cla))return [30,'Non food'];return null;}
+function retDays(cla,vida){const r=retRule(cla);if(r)return r[0];const v=VIDA.find(x=>x[0]===vida);return v?v[2]:null;}
+const lotAnt=l=>l.ant!=null?l.ant:(retRule(l.cla)||[QS.cfg().ant])[0];
+const retDate=(fv,ant)=>{const [y,m,d]=fv.split('-').map(Number);return dayStr(new Date(y,m-1,d-ant));};
+function lotState(l){const c=QS.cfg(),n=daysTo(l.fv),a=lotAnt(l);if(l.status==='retirado')return 'ret';if(n<0)return 'venc';if(n<=a)return 'retirar';if(n<=a+c.prox)return 'prox';return 'ok';}
 function qCounts(){const L=QS.lots().filter(l=>l.status!=='retirado');const o={venc:0,retirar:0,prox:0,ok:0};for(const l of L)o[lotState(l)]++;o.now=o.venc+o.retirar;o.act=L.length;return o;}
 function setMode(m){MODE=m;LS.set('mode',m);$('#nav').classList.toggle('hide',m!=='osa');$('#navQ').classList.toggle('hide',m!=='cal');$('#navD').classList.toggle('hide',m!=='don');$('#hMode').textContent=m==='cal'?'🧪 Calidad ⇄':m==='don'?'🎁 Donaciones ⇄':'📦 Disponib. ⇄';go(m==='cal'?'qhome':m==='don'?'dhome':'home');}
 function vMode(){$('#nav').classList.add('hide');$('#navQ').classList.add('hide');$('#navD').classList.add('hide');const dn=DN.all().filter(d=>d.status==='enviada').length;const q=qCounts();
@@ -489,7 +497,7 @@ function vMode(){$('#nav').classList.add('hide');$('#navQ').classList.add('hide'
   <div class="card" style="margin-top:12px">${act('📦','g','Disponibilidad','Pistolear pasillos: lo no exhibido con stock = reponer','mOsa')}${act('🧪','v','Calidad','Fechas de vencimiento: revisar, cargar fechas cortas y retirar'+(q.now?' · ⚠️ '+q.now+' por retirar':''),'mCal')}${act('🎁','o','Donaciones','Solicitud de entrega de donaciones'+(dn?' · '+dn+' por entregar':''),'mDon')}</div>`;
   $('#mOsa').onclick=()=>setMode('osa');$('#mCal').onclick=()=>setMode('cal');$('#mDon').onclick=()=>setMode('don');}
 function lotRow(l,btn=true){const n=daysTo(l.fv),st=lotState(l);const col=st==='venc'||st==='retirar'?'#dc2626':st==='prox'?'#ea580c':'#16a34a';
-  const txt=st==='ret'?'retirado '+fdt(l.retAt)+' por '+esc(l.retBy||''):n<0?'venció hace '+(-n)+' día(s)':n===0?'vence HOY':'vence en '+n+' día(s)';
+  const txt=(st==='ret'?'retirado '+fdt(l.retAt)+' por '+esc(l.retBy||''):n<0?'venció hace '+(-n)+' día(s)':n===0?'vence HOY':'vence en '+n+' día(s)')+(st!=='ret'?' · retiro '+fdate(retDate(l.fv,lotAnt(l)))+(st==='retirar'?' ⚠️ RETIRAR':''):'');
   return `<div class="it" data-l="${l.id}"><div class="grow"><div class="d">${esc(l.desc)}</div><div class="c">${idC(PR[BYSKU.get(String(l.sku))]||{gtin:l.gtin},l.sku)} · OH ${(()=>{const x=PR[BYSKU.get(String(l.sku))];return x?fmt(x.oh):'-';})()}</div><div class="c">${fdate(l.fv)} · <b style="color:${col}">${txt}</b>${l.qty?' · '+fmt(l.qty)+' und':''} · ${esc(l.userName||'')}</div></div>${btn&&st!=='ret'?`<button class="btn sm pri" data-ret="${l.id}">Retirado</button>`:''}</div>`;}
 function groupLots(L,btn){if(!L.length)return '<div class="empty">Nada por aquí 🎉</div>';const g=new Map();
   for(const l of L){const k=l.aisleName||'Sin pasillo';if(!g.has(k))g.set(k,new Map());const m=g.get(k);if(!m.has(l.cla))m.set(l.cla,[]);m.get(l.cla).push(l);}
@@ -507,12 +515,12 @@ function vQHome(){const q=qCounts(),c=QS.cfg();const A=S.aisles().filter(a=>a.ac
   const last=new Map();for(const r of R){if(r.open)continue;for(const cl of r.classes){const k=r.aisleId+'|'+cl;if(!last.has(k)||last.get(k)<r.end)last.set(k,r.end);}}
   const open=R.find(r=>r.open&&r.userId===ME.id);
   const rows=A.map(a=>{const cls=srt(a.cats).filter(x=>CLS_CNT.get(x));const done=cls.filter(x=>{const t=last.get(a.id+'|'+x);return t&&dayStr(t)===today;}).length;return {a,cls,done};});
-  $('#main').innerHTML=`${q.now?`<div class="card" style="background:#fef2f2;border:1px solid #fecaca;cursor:pointer" id="qAl"><b style="color:#dc2626">⚠️ ${q.now} producto(s) para retirar</b><div class="sub">${q.venc} vencido(s) y ${q.retirar} dentro de los ${c.ant} día(s) de anticipación. Toca para verlos.</div></div>`:''}
+  $('#main').innerHTML=`${q.now?`<div class="card" style="background:#fef2f2;border:1px solid #fecaca;cursor:pointer" id="qAl"><b style="color:#dc2626">⚠️ ${q.now} producto(s) para retirar</b><div class="sub">${q.venc} vencido(s) y ${q.retirar} en su fecha de retiro según el cuadro. Toca para verlos.</div></div>`:''}
   <div class="kp3"><div class="kpi"><div class="v" style="color:#dc2626">${q.now}</div><div class="l">retirar ya</div></div><div class="kpi"><div class="v" style="color:var(--ora)">${q.prox}</div><div class="l">próximos ${c.prox} días</div></div><div class="kpi"><div class="v">${q.act}</div><div class="l">fechas activas</div></div></div>
   ${open?`<div class="card" style="border:1px solid var(--amb)"><b>Revisión abierta:</b> ${esc(open.aisleName)}${open.cls?' · '+esc(recLbl(open)):''}<div class="row" style="margin-top:8px"><button class="btn pri sm" id="qCont">📷 Seguir revisando</button></div></div>`:''}
   <button class="btn pri big" id="qGo">🧪 Revisar fechas de un pasillo</button>
   <div class="sec">Revisado hoy por pasillo</div><div class="card">${rows.map(o=>`<div class="act" data-qa="${o.a.id}"><div class="ic ${o.done===o.cls.length&&o.cls.length?'g':o.done?'y':'r'}">${o.done===o.cls.length&&o.cls.length?'✓':o.done?'½':'·'}</div><div class="grow"><div class="t">${esc(o.a.name)}</div><div class="s">${o.done} de ${o.cls.length} clase(s) revisadas hoy</div></div><div class="ch">›</div></div>`).join('')||'<div class="empty">No hay pasillos.</div>'}</div>
-  ${isAdmin()?`<div class="card">${act('⚙️','b','Días de anticipación para retiro: '+c.ant,'Se avisa para retirar '+c.ant+' día(s) antes de la fecha. Próximos: '+c.prox+' días','qCfg')}</div>`:''}`;
+  ${isAdmin()?`<div class="card">${act('⚙️','b','Cuadro de retiro antes de vencer','≤20 días: 1 · hasta 2 meses: 3 · hasta 6 meses: 7 · más: 15 · por clase según cuadro. Próximos: '+c.prox+' días','qCfg')}</div>`:''}`;
   const al=$('#qAl');if(al)al.onclick=()=>go('qalert');$('#qGo').onclick=()=>go('qscan');const qc=$('#qCont');if(qc)qc.onclick=()=>{QREV=open;qScanUI();};
   $$('[data-qa]').forEach(e=>e.onclick=()=>qAisle(e.dataset.qa,last));const cf=$('#qCfg');if(cf)cf.onclick=qCfgSheet;}
 function qAisle(aid,last){const a=S.aisles().find(x=>x.id===aid);const cls=srt(a.cats).filter(x=>CLS_CNT.get(x));const lots=QS.lots().filter(l=>l.aisleId===aid&&l.status!=='retirado');
@@ -552,23 +560,31 @@ function qCode(c){c=String(c||'').trim();if(!c||!QREV)return;const x=findCode(c)
   if(!x){fsInfo('⛔ Código '+c+' no está en la base','err');flashScan('err','Código no encontrado',c);toast('⛔ Código '+c+' no está en la base','err');beep(220);return;}
   if(!QREV.classes.includes(x.cla)){fsInfo('⛔ No es de esta revisión: '+short(x.cla),'err');toast('⛔ "'+x.desc+'" es de '+x.cla,'err',4000);beep(220);vib([60,60,60]);return;}
   QREV.seen[x.sku]=Date.now();qSave();beep(1800);vib(70);const wasCam=!$('#fs').classList.contains('hide');if(wasCam){camOff();$('#fs').classList.add('hide');}
-  const prev=QS.lots().filter(l=>l.sku===x.sku&&l.status!=='retirado');
+  const prev=QS.lots().filter(l=>l.sku===x.sku&&l.status!=='retirado');const pr=prev.filter(l=>['venc','retirar'].includes(lotState(l)));if(pr.length){beep(220);setTimeout(()=>beep(220),180);vib([80,60,80]);}
+  const rule=retRule(x.cla);const VM=LS.get('vida',{});const v0=VM[x.sku]||VM['c|'+x.cla]||'';
   const sh=sheet(`<h2>${esc(x.desc)}</h2><div class="sub">${esc(short(x.cla))} · ${esc(x.gtin)} · OH ${fmt(x.oh)}</div>
-   ${prev.length?`<div class="card sub" style="margin-top:8px">Ya tiene fecha(s) registrada(s): ${prev.map(l=>fdate(l.fv)).join(', ')}</div>`:''}
+   ${pr.length?`<div class="card" style="margin-top:8px;background:#fef2f2;border:1px solid #fecaca"><b style="color:#dc2626">⚠️ PARA RETIRO</b><div class="sub">${pr.map(l=>'vence '+fdate(l.fv)+' · retirar desde '+fdate(retDate(l.fv,lotAnt(l)))).join('<br>')}</div><button class="btn sm pri" style="margin-top:6px" data-qret="1">Ya lo retiré</button></div>`:prev.length?`<div class="card sub" style="margin-top:8px">Ya tiene fecha(s) registrada(s): ${prev.map(l=>fdate(l.fv)+' (retiro '+fdate(retDate(l.fv,lotAnt(l)))+')').join(', ')}</div>`:''}
    <div class="sub" style="margin-top:10px">¿Tiene fecha corta?</div>
    <label class="f">Fecha de vencimiento</label><input class="inp" type="date" id="qF" min="${dayStr(Date.now()-864e5*30)}">
+   ${rule?`<div class="sub" style="margin-top:6px">Cuadro: <b>${rule[1]}</b> → retirar ${rule[0]} día(s) antes</div>`:`<label class="f">Tiempo de vida del producto</label><select class="sel" id="qV"><option value="">Elige…</option>${VIDA.map(v=>`<option value="${v[0]}" ${v[0]===v0?'selected':''}>${v[1]} → retirar ${v[2]} día(s) antes${v[0]==='20'?' (Tottus App 2)':''}</option>`).join('')}</select>`}
+   <div id="qR" style="margin-top:8px"></div>
    <label class="f">Cantidad en góndola (opcional)</label><input class="inp" id="qQ" inputmode="numeric">
    <div class="row" style="margin-top:14px;flex-wrap:wrap"><button class="btn grow" id="qNo">✓ Fecha OK, siguiente</button><button class="btn pri grow" id="qYes">Guardar fecha corta</button></div>`);
   const next=()=>{sh.remove();qScanUI(wasCam);};sh.querySelector('.x').onclick=next;
-  sh.querySelector('#qNo').onclick=next;
+  sh.querySelector('#qNo').onclick=next;const qv=sh.querySelector('#qV');
+  const calc=()=>{const f=sh.querySelector('#qF').value,a=retDays(x.cla,qv?qv.value:'');const e=sh.querySelector('#qR');if(!f||a==null){e.innerHTML='';return;}const n=daysTo(f),rd=retDate(f,a);
+    e.innerHTML=n<=a?`<div class="card" style="background:#fef2f2;border:1px solid #fecaca;margin:0"><b style="color:#dc2626">⚠️ ESTÁ PARA RETIRO</b><div class="sub">${n<0?'Ya venció':'Vence en '+n+' día(s)'}; se retira ${a} día(s) antes (desde ${fdate(rd)}).</div></div>`:`<div class="card" style="background:#f0fdf4;border:1px solid #bbf7d0;margin:0"><b style="color:var(--g)">Aún no toca retirar</b><div class="sub">Retirar el ${fdate(rd)} (${a} día(s) antes de vencer).</div></div>`;};
+  sh.querySelector('#qF').oninput=calc;sh.querySelector('#qF').onchange=calc;if(qv)qv.onchange=calc;
+  const qr=sh.querySelector('[data-qret]');if(qr)qr.onclick=()=>{const L=QS.lots();for(const l of L)if(pr.some(p=>p.id===l.id)){l.status='retirado';l.retAt=Date.now();l.retBy=ME.name;l.upd=Date.now();}QS.setLots(L);toast('Marcado como retirado','ok');next();};
   sh.querySelector('#qYes').onclick=()=>{const f=sh.querySelector('#qF').value;if(!f){toast('Elige la fecha de vencimiento','err');return;}
-    const L=QS.lots();L.unshift({id:uid(),sku:x.sku,gtin:x.gtin,desc:x.desc,cla:x.cla,aisleId:QREV.aisleId,aisleName:QREV.aisleName,revId:QREV.id,fv:f,qty:+sh.querySelector('#qQ').value||0,userId:ME.id,userName:ME.name,created:Date.now(),status:'activo',upd:Date.now()});QS.setLots(L.slice(0,3000));
-    const n=daysTo(f);toast(n<=QS.cfg().ant?'⚠️ Guardado: hay que retirarlo YA':'Fecha guardada · vence en '+n+' día(s)',n<=QS.cfg().ant?'err':'ok',3000);next();};}
+    if(qv&&!qv.value){toast('Elige el tiempo de vida del producto','err');return;}const ant=retDays(x.cla,qv?qv.value:'');if(qv){const VM=LS.get('vida',{});VM[x.sku]=qv.value;VM['c|'+x.cla]=qv.value;LS.set('vida',VM);}
+    const L=QS.lots();L.unshift({id:uid(),sku:x.sku,gtin:x.gtin,desc:x.desc,cla:x.cla,aisleId:QREV.aisleId,aisleName:QREV.aisleName,revId:QREV.id,fv:f,ant,vida:qv?qv.value:'',qty:+sh.querySelector('#qQ').value||0,userId:ME.id,userName:ME.name,created:Date.now(),status:'activo',upd:Date.now()});QS.setLots(L.slice(0,3000));
+    const n=daysTo(f);toast(n<=ant?'⚠️ Guardado: ESTÁ PARA RETIRO, sácalo ya':'Fecha guardada · retirar el '+fdate(retDate(f,ant)),n<=ant?'err':'ok',3500);next();};}
 let QTAB='now',QAF='';
 function vQAlert(){const c=QS.cfg();const A=S.aisles();let L=QS.lots();if(QAF)L=L.filter(l=>l.aisleId===QAF);
   const sets={now:L.filter(l=>['venc','retirar'].includes(lotState(l))),prox:L.filter(l=>lotState(l)==='prox'),all:L.filter(l=>l.status!=='retirado'),ret:L.filter(l=>l.status==='retirado').sort((a,b)=>b.retAt-a.retAt).slice(0,200)};
   const tabs=[['now','Retirar ya'],['prox','Próximos'],['all','Todas'],['ret','Retirados']];
-  $('#main').innerHTML=`<h1 style="font-size:22px">Alertas de retiro</h1><div class="sub">Se avisa ${c.ant} día(s) antes del vencimiento. Toca "Retirado" cuando lo saques de la góndola.</div>
+  $('#main').innerHTML=`<h1 style="font-size:22px">Alertas de retiro</h1><div class="sub">Se avisa según el cuadro de días de retiro antes de vencer. Toca "Retirado" cuando lo saques de la góndola.</div>
   <div class="row" style="flex-wrap:wrap;gap:6px;margin:10px 0">${tabs.map(([k,t])=>`<button class="btn sm ${QTAB===k?'pri':''}" data-t="${k}">${t} (${sets[k].length})</button>`).join('')}</div>
   <select class="sel" id="qAf"><option value="">Todos los pasillos</option>${A.map(a=>`<option value="${a.id}" ${QAF===a.id?'selected':''}>${esc(a.name)}</option>`).join('')}</select>
   ${QTAB==='now'||QTAB==='prox'?`<a id="qWa" style="display:block;margin:8px 2px;cursor:pointer">📤 Enviar lista por WhatsApp</a>`:''}
