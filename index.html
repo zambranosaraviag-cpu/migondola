@@ -741,19 +741,19 @@ const qVB=(k,t,s)=>{const C={r:['#dc2626','#fef2f2','#fecaca','⛔'],l:['#ea580c
 const qIco=a=>{const n={};for(const c of a.cats){if(!CLS_CNT.get(c))continue;const k=teamOf(c);n[k]=(n[k]||0)+(CLS_CNT.get(c)||0);}const k=Object.keys(n).sort((x,y)=>n[y]-n[x])[0];return ((TEAMS.find(x=>x[0]===k)||['','🗂️'])[1]).split(' ')[0];};
 const aNm=a=>a.name.match(/^(Pasillo \d+|Cajas)\s*[-–(]?\s*(.*?)\)?$/)||[0,a.name,''];
 function vQHome(){const A=S.aisles().filter(a=>a.active!==false);const R=QS.revs();const today=dayStr(Date.now());const q=qCounts();
-  const open=R.find(r=>r.open&&r.userId===ME.id);const done=new Set(R.filter(r=>!r.open&&r.end&&dayStr(r.end)===today).map(r=>r.aisleId));
+  const open=R.find(r=>r.open&&r.userId===ME.id);const pct=new Map();for(const a of A){const S_=new Set();for(const r of R)if(r.aisleId===a.id&&dayStr(r.start)===today)for(const k in (r.seen||{}))S_.add(k);if(!S_.size)continue;const PL=planOf(a);const n=PL.filter(x=>S_.has(x.sku)).length;pct.set(a.id,PL.length?Math.round(n*100/PL.length):0);}
   $('#main').innerHTML=`${q.now?`<div class="card" style="background:#fef2f2;border:1px solid #fecaca;cursor:pointer" id="qAl"><b style="color:#dc2626">⛔ ${q.now} producto(s) para RETIRAR</b><div class="sub">Toca para verlos en Consultador.</div></div>`:''}
   ${open?`<div class="card" style="border:1px solid var(--amb)"><b>Revisión abierta:</b> ${esc(open.aisleName)}<div class="row" style="margin-top:8px"><button class="btn pri sm" id="qCont">📷 Seguir revisando</button>${isAdmin()?'<button class="btn dan sm" id="qDelO">🗑️ Borrar</button>':''}</div></div>`:''}
   <h1 style="font-size:22px">¿Qué pasillo vas a revisar?</h1><div class="sub">Toca el pasillo y empieza a pistolear. Verás la lista de productos de referencia.</div>
-  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px">${A.map(a=>{const m=aNm(a);const ok=done.has(a.id);return `<div data-qa="${a.id}" style="cursor:pointer;background:${ok?'#f0fdf4':'#f6f7f6'};border:1px solid ${ok?'#bbf7d0':'var(--ln)'};border-radius:12px;padding:10px 6px;text-align:center;min-width:0"><div style="font-size:18px">${ok?'✅':qIco(a)}</div><div style="font-weight:800;font-size:14px">${esc(m[1])}</div><div class="sub" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m[2])}</div></div>`;}).join('')}</div>`;
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px">${A.map(a=>{const m=aNm(a);const pc=pct.get(a.id);const ok=pc>=95;return `<div data-qa="${a.id}" style="cursor:pointer;background:${ok?'#f0fdf4':'#f6f7f6'};border:1px solid ${ok?'#bbf7d0':'var(--ln)'};border-radius:12px;padding:10px 6px;text-align:center;min-width:0"><div style="font-size:18px">${ok?'✅':qIco(a)}</div><div style="font-weight:800;font-size:14px">${esc(m[1])}</div><div class="sub" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m[2])}</div>${pc!=null?`<div style="font-size:11px;font-weight:700;color:${ok?'var(--g)':'var(--ora)'}">${pc}% hoy</div>`:''}</div>`;}).join('')}</div>`;
   const al=$('#qAl');if(al)al.onclick=()=>go('qret');const qc=$('#qCont');if(qc)qc.onclick=()=>{QREV=open;qScanUI();};const qd=$('#qDelO');if(qd)qd.onclick=()=>qDelRev(open.id,()=>go('qhome'));
   $$('[data-qa]').forEach(e=>e.onclick=()=>{const a=A.find(x=>x.id===e.dataset.qa);if(open){if(open.aisleId===a.id){QREV=open;qScanUI(true);return;}if(!confirm('Tienes abierta la revisión de '+open.aisleName+'. ¿Terminarla y empezar '+a.name+'?'))return;QREV=open;qFinish();}qStart(a,null);});}
 let RTAB='now';
 function vQRet(){VIEW='qret';const L=QS.lots();const sets={now:L.filter(l=>['venc','retirar'].includes(lotState(l))),prox:L.filter(l=>lotState(l)==='prox')};
-  $('#main').innerHTML=`<h1 style="font-size:22px">Consultador</h1><div class="sub">Pistolea el producto y te dice si se retira, se liquida o está conforme.</div>
+  $('#main').innerHTML=`<h1 style="font-size:22px">Consultador</h1><div class="sub">Pistolea el producto, ingresa su fecha de vencimiento y te dice si se retira, se liquida o está conforme.</div>
   <button class="btn pri big" id="rCam" style="padding:18px;font-size:18px;margin-top:10px">📷 Pistolear y consultar</button>
   <div class="row" style="margin:10px 0"><input class="inp grow" id="rMan" placeholder="Código de barras o SKU" inputmode="numeric"><button class="btn pri" id="rGo">Consultar</button></div>
-  <div class="row" style="gap:6px;margin:12px 0 4px"><button class="btn sm ${RTAB==='now'?'pri':''}" data-rt="now">⛔ Retirar (${sets.now.length})</button><button class="btn sm ${RTAB==='prox'?'pri':''}" data-rt="prox">🏷️ Liquidar (${sets.prox.length})</button></div>
+  <div class="sec">Registrados en revisiones</div><div class="row" style="gap:6px;margin:4px 0 4px"><button class="btn sm ${RTAB==='now'?'pri':''}" data-rt="now">⛔ Retirar (${sets.now.length})</button><button class="btn sm ${RTAB==='prox'?'pri':''}" data-rt="prox">🏷️ Liquidar (${sets.prox.length})</button></div>
   ${sets[RTAB].length?`<a id="rWa" style="display:block;margin:8px 2px;cursor:pointer">📤 Enviar lista por WhatsApp</a>`:''}
   ${groupLots(sets[RTAB],true)}`;
   $('#rCam').onclick=camOnF;const go_=()=>{const v=$('#rMan').value;$('#rMan').value='';qConsult(v);};$('#rGo').onclick=go_;$('#rMan').onkeydown=e=>{if(e.key==='Enter')go_();};
@@ -761,16 +761,25 @@ function vQRet(){VIEW='qret';const L=QS.lots();const sets={now:L.filter(l=>['ven
   const w=$('#rWa');if(w)w.onclick=()=>{const t='*'+(RTAB==='now'?'RETIRAR':'LIQUIDAR')+'* — '+HOME_LOCAL+'\n'+sets[RTAB].sort((a,b)=>a.fv.localeCompare(b.fv)).map(l=>{const x=PR[BYSKU.get(String(l.sku))];return waLine(l.sku,l.desc,x?x.oh:'')+'\n   Vence '+fdate(l.fv)+' · retiro '+fdate(retDate(l.fv,lotAnt(l)))+(l.aisleName?' · '+l.aisleName:'');}).join('\n');doShare(t);};}
 function qConsult(c){c=String(c||'').trim();if(!c)return;const x=findCode(c)||(BYSKU.has(c)?PR[BYSKU.get(c)]:null);
   if(!x){fsInfo('⛔ Código '+c+' no está en la base','err');toast('⛔ Código '+c+' no está en la base','err');beep(220);return;}
-  const wasCam=!$('#fs').classList.contains('hide');if(wasCam){camOff();$('#fs').classList.add('hide');}
-  const L=QS.lots().filter(l=>l.sku===x.sku&&l.status!=='retirado').sort((a,b)=>a.fv.localeCompare(b.fv));const R=L.filter(l=>['venc','retirar'].includes(lotState(l)));
-  if(R.length){beep(220);setTimeout(()=>beep(220),180);vib([80,60,80]);}else{beep(1800);vib(70);}
-  const card=l=>{const st=lotState(l),n=daysTo(l.fv),rd=fdate(retDate(l.fv,lotAnt(l)));const vt=n<0?'Vencido':n===0?'Vence hoy':'Vence '+fdate(l.fv)+' (en '+n+' día(s))';
-    return st==='venc'||st==='retirar'?qVB('r','RETIRAR',vt+' · retiro desde '+rd):st==='prox'?qVB('l','LIQUIDAR',vt+' · retiro el '+rd):qVB('d','CONFORME','Vigente · '+vt+' · retiro el '+rd);};
-  const sh=sheet(`<h2 style="margin-right:36px">${esc(x.desc)}</h2><div class="sub">${esc(short(x.cla))} · ${esc(x.gtin)} · OH ${fmt(x.oh)}</div>
-   ${L.length?L.map(card).join(''):qVB('n','SIN FECHA REGISTRADA','No tiene fechas cortas cargadas. Revisa la fecha en el empaque.')}
-   <div class="row" style="margin-top:14px"><button class="btn grow" id="cNx">Siguiente</button>${R.length?'<button class="btn pri grow" id="cRet" style="background:#dc2626;border-color:#dc2626">✓ Retirado</button>':''}</div>`);
-  const next=()=>{sh.remove();vQRet();if(wasCam)camOnF();};sh.querySelector('.x').onclick=next;sh.querySelector('#cNx').onclick=next;
-  const cr=sh.querySelector('#cRet');if(cr)cr.onclick=()=>{const A=QS.lots();for(const l of A)if(R.some(r=>r.id===l.id)){l.status='retirado';l.retAt=Date.now();l.retBy=ME.name;l.upd=Date.now();}QS.setLots(A);toast('Retirado de góndola','ok');next();};}
+  beep(1800);vib(70);const wasCam=!$('#fs').classList.contains('hide');if(wasCam){camOff();$('#fs').classList.add('hide');}
+  const rule=retRule(x.cla);const vk=sclOf(x)||x.cla;const cv=claVida(vk);
+  const info=rule?rule[1]+' · retiro '+rule[0]+' día(s) antes':cv?VIDA.find(v=>v[0]===cv)[1]+' · retiro '+VIDA.find(v=>v[0]===cv)[2]+' día(s) antes':'';
+  const sh=sheet(`<h2 style="margin-right:36px">${esc(x.desc)}</h2><div class="sub">${esc(short(x.cla))} · ${esc(x.gtin)} · OH ${fmt(x.oh)}${info?'<br>'+esc(info):''}</div>
+   ${!rule&&!cv?`<label class="f">Tiempo de vida de la subclase ${esc(short(vk))}</label><select class="sel" id="cV"><option value="">Elige…</option>${VIDA.map(v=>`<option value="${v[0]}">${v[1]} · retiro ${v[2]} día(s) antes</option>`).join('')}</select>`:''}
+   <label class="f">Fecha de vencimiento</label><input class="inp" type="date" id="cF" style="font-size:20px;padding:12px">
+   <div id="cR"></div>
+   <div class="row" style="margin-top:14px" id="cBt"><button class="btn pri grow" id="cNx">Consultar otro</button></div>`);
+  const cvs=sh.querySelector('#cV');
+  const next=()=>{sh.remove();vQRet();if(wasCam)camOnF();};sh.querySelector('.x').onclick=next;
+  const calc=()=>{const f=sh.querySelector('#cF').value,a=retDays(x.cla,cvs?cvs.value:cv);const e=sh.querySelector('#cR');
+    if(!f){e.innerHTML='';return;}if(a==null){e.innerHTML='<div class="sub" style="margin-top:8px;color:var(--ora)">Elige el tiempo de vida de la subclase.</div>';return;}
+    if(cvs&&cvs.value)setClaVida(vk,cvs.value);
+    const n=daysTo(f),rd=fdate(retDate(f,a)),lq=QS.cfg().prox;const vt=n<0?'Vencido':n===0?'Vence hoy':'Vence en '+n+' día(s)';
+    if(n<=a){e.innerHTML=qVB('r','RETIRAR',vt+' · retiro desde '+rd);beep(220);setTimeout(()=>beep(220),180);vib([80,60,80]);}
+    else if(n<=a+lq)e.innerHTML=qVB('l','LIQUIDAR',vt+' · retiro el '+rd+' · '+(n-a)+' día(s) para venderlo');
+    else e.innerHTML=qVB('d','CONFORME','Vigente · '+vt+' · retiro el '+rd);};
+  sh.querySelector('#cF').oninput=calc;sh.querySelector('#cF').onchange=calc;if(cvs)cvs.onchange=calc;sh.querySelector('#cNx').onclick=next;
+  setTimeout(()=>{const f=sh.querySelector('#cF');if(f){f.focus();try{f.showPicker&&f.showPicker();}catch(e){}}},150);}
 function vQAud(){const A=S.aisles().filter(a=>a.active!==false);const M=QS.aud();const today=dayStr(Date.now());const R=QS.revs();const c=QS.cfg();
   const last=new Map();for(const m of M){const k=m.aisleId+'|'+m.sub;if(!last.has(k))last.set(k,m);}
   const subsOf=a=>{const s=new Map();for(const x of PR)if(x.act&&a.cats.includes(x.cla))s.set(x.sub,(s.get(x.sub)||0)+1);return [...s.keys()].sort();};
