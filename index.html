@@ -770,26 +770,56 @@ function qConsult(c){c=String(c||'').trim();if(!c)return;const x=findCode(c)||(B
    <div id="cR"></div>
    <div class="row" style="margin-top:14px" id="cBt"><button class="btn pri grow" id="cNx">Consultar otro</button></div>`);
   const cvs=sh.querySelector('#cV');
-  const next=()=>{sh.remove();vQRet();if(wasCam)camOnF();};sh.querySelector('.x').onclick=next;
-  const calc=()=>{const f=sh.querySelector('#cF').value,a=retDays(x.cla,cvs?cvs.value:cv);const e=sh.querySelector('#cR');
+  let VER='',FV='',ANT=0;const ais=S.aisles().find(a=>a.cats.includes(x.cla));
+  const keep=st=>{const L=QS.lots();if(L.some(l=>l.sku===x.sku&&l.fv===FV&&l.status!=='retirado'&&st!=='ret'))return;const o={id:uid(),sku:x.sku,gtin:x.gtin,desc:x.desc,cla:x.cla,aisleId:ais?ais.id:'',aisleName:ais?ais.name:'',revId:'consulta',fv:FV,ant:ANT,vida:cvs?cvs.value:cv,qty:0,userId:ME.id,userName:ME.name,created:Date.now(),status:'activo',upd:Date.now()};if(st==='ret'){o.status='retirado';o.retAt=Date.now();o.retBy=ME.name;}L.unshift(o);QS.setLots(L.slice(0,3000));};
+  const next=()=>{if(VER==='l'){keep('act');toast('Guardado para liquidar','ok');}sh.remove();vQRet();if(wasCam)camOnF();};sh.querySelector('.x').onclick=next;
+  const calc=()=>{const f=sh.querySelector('#cF').value,a=retDays(x.cla,cvs?cvs.value:cv);const e=sh.querySelector('#cR');VER='';const bt=sh.querySelector('#cBt');bt.innerHTML='<button class="btn pri grow" id="cNx">Consultar otro</button>';sh.querySelector('#cNx').onclick=next;
     if(!f){e.innerHTML='';return;}if(a==null){e.innerHTML='<div class="sub" style="margin-top:8px;color:var(--ora)">Elige el tiempo de vida de la subclase.</div>';return;}
     if(cvs&&cvs.value)setClaVida(vk,cvs.value);
-    const n=daysTo(f),rd=fdate(retDate(f,a)),lq=QS.cfg().prox;const vt=n<0?'Vencido':n===0?'Vence hoy':'Vence en '+n+' día(s)';
-    if(n<=a){e.innerHTML=qVB('r','RETIRAR',vt+' · retiro desde '+rd);beep(220);setTimeout(()=>beep(220),180);vib([80,60,80]);}
-    else if(n<=a+lq)e.innerHTML=qVB('l','LIQUIDAR',vt+' · retiro el '+rd+' · '+(n-a)+' día(s) para venderlo');
+    const n=daysTo(f),rd=fdate(retDate(f,a)),lq=QS.cfg().prox;const vt=n<0?'Vencido':n===0?'Vence hoy':'Vence en '+n+' día(s)';FV=f;ANT=a;
+    if(n<=a){VER='r';e.innerHTML=qVB('r','RETIRAR',vt+' · retiro desde '+rd);beep(220);setTimeout(()=>beep(220),180);vib([80,60,80]);
+      bt.innerHTML='<button class="btn grow" id="cNx">Consultar otro</button><button class="btn pri grow" id="cRt" style="background:#dc2626;border-color:#dc2626">✓ Retirado</button>';sh.querySelector('#cNx').onclick=next;sh.querySelector('#cRt').onclick=()=>{keep('ret');toast('Retirado y guardado','ok');VER='';next();};}
+    else if(n<=a+lq){VER='l';e.innerHTML=qVB('l','LIQUIDAR',vt+' · retiro el '+rd+' · '+(n-a)+' día(s) para venderlo')+'<div class="sub" style="margin-top:6px">Se guarda en la lista Liquidar.</div>';}
     else e.innerHTML=qVB('d','CONFORME','Vigente · '+vt+' · retiro el '+rd);};
-  sh.querySelector('#cF').oninput=calc;sh.querySelector('#cF').onchange=calc;if(cvs)cvs.onchange=calc;sh.querySelector('#cNx').onclick=next;
+  sh.querySelector('#cF').oninput=calc;sh.querySelector('#cF').onchange=calc;if(cvs)cvs.onchange=calc;calc();
   setTimeout(()=>{const f=sh.querySelector('#cF');if(f){f.focus();try{f.showPicker&&f.showPicker();}catch(e){}}},150);}
 function vQAud(){const A=S.aisles().filter(a=>a.active!==false);const M=QS.aud();const today=dayStr(Date.now());const R=QS.revs();const c=QS.cfg();
-  const last=new Map();for(const m of M){const k=m.aisleId+'|'+m.sub;if(!last.has(k))last.set(k,m);}
+  const last=new Map();for(const m of M){if(m.t==='mu')continue;const k=m.aisleId+'|'+m.sub;if(!last.has(k))last.set(k,m);}
   const subsOf=a=>{const s=new Map();for(const x of PR)if(x.act&&a.cats.includes(x.cla))s.set(x.sub,(s.get(x.sub)||0)+1);return [...s.keys()].sort();};
-  $('#main').innerHTML=`<h1 style="font-size:22px">Inspección</h1><div class="sub">Marca el avance de cada pasillo por subdepartamento. Puedes anotar hasta qué cuerpo se avanzó.</div>
+  const st=qStatus(A,R,M,today);
+  $('#main').innerHTML=`<h1 style="font-size:22px">Inspección</h1>
+  <div class="sec">Status de avance hoy</div><div class="card" style="padding:6px 10px">${st.rows||'<div class="empty">Hoy aún no hay revisiones</div>'}</div>
+  ${st.users?`<div class="sec">Por colaborador</div><div class="card" style="padding:6px 10px">${st.users}</div>`:''}
+  <div class="sec">Avance por subdepartamento</div><div class="sub">Marca el avance de cada pasillo por subdepartamento. Puedes anotar hasta qué cuerpo se avanzó.</div>
   ${A.map(a=>{const subs=subsOf(a);const rv=R.filter(r=>r.aisleId===a.id&&dayStr(r.start)===today);const nT=subs.filter(s=>{const m=last.get(a.id+'|'+s);return m&&m.day===today;}).length;
     return `<div class="sec">${esc(a.name)} · ${nT}/${subs.length} hoy${rv.length?' · '+rv.length+' revisión(es) del equipo':''}</div><div class="card" style="padding:6px 10px">${subs.map(s=>{const m=last.get(a.id+'|'+s);const hoy=m&&m.day===today;
       return `<div class="it" data-au="${a.id}" data-su="${esc(s)}" style="cursor:pointer"><div class="ic ${hoy?'g':''}" style="width:26px;height:26px;border-radius:8px;display:grid;place-items:center;background:${hoy?'#dcfce7':'#f1f5f9'}">${hoy?'✓':'·'}</div><div class="grow"><div class="d">${esc(short(s))}</div><div class="c">${m?(hoy?'<b style="color:var(--g)">Avance hoy</b>':'Último: '+fdate(m.day))+(m.cuerpos?' · cuerpos '+esc(m.cuerpos):' · completo')+(m.nota?' · '+esc(m.nota):'')+' · '+esc(m.userName):'Sin avance'}</div></div><div class="ch">›</div></div>`;}).join('')||'<div class="empty">Sin productos</div>'}</div>`;}).join('')}
   <div class="sec">Configuración</div><div class="card">${act('🗓️','y','Tiempo de vida por subclase','Cambia cuando quieras el tiempo de vida de cada subclase','qVida')}${act('⚙️','b','Cuadro de retiro y liquidación','Retiro según cuadro · liquidar desde '+c.prox+' días antes del retiro','qCfg')}${act('🕘','v','Historial de revisiones','Revisiones del equipo','qHi')}</div>`;
   $('#qVida').onclick=()=>go('qvida');$('#qCfg').onclick=qCfgSheet;$('#qHi').onclick=()=>go('qhist');
-  $$('[data-au]').forEach(e=>e.onclick=()=>audSheet(A.find(a=>a.id===e.dataset.au),e.dataset.su));}
+  $$('[data-au]').forEach(e=>e.onclick=()=>audSheet(A.find(a=>a.id===e.dataset.au),e.dataset.su));
+  $$('[data-mu]').forEach(b=>b.onclick=e=>{e.stopPropagation();muSheet(A.find(a=>a.id===b.dataset.mu),R,today);});}
+function qStatus(A,R,M,today){let rows='';const U=new Map();
+  for(const a of A){const rv=R.filter(r=>r.aisleId===a.id&&dayStr(r.start)===today);if(!rv.length)continue;const S_=new Map();
+    for(const r of rv){for(const k in (r.seen||{})){S_.set(k,r.seen[k]);const u=U.get(r.userName)||{n:0,t:[],a:new Set()};u.n++;u.t.push(r.seen[k]);u.a.add(a.name);U.set(r.userName,u);}}
+    const PL=planOf(a);const n=PL.filter(x=>S_.has(x.sku)).length;const pc=PL.length?Math.round(n*100/PL.length):0;const ts=[...S_.values()].sort((x,y)=>x-y);
+    const min=ts.length>1?(ts[ts.length-1]-ts[0])/6e4:0;const rit=min>0?ts.length/min:0;const fast=ts.length>=10&&rit>12;
+    const mu=M.find(m=>m.t==='mu'&&m.aisleId===a.id&&m.day===today);const who=[...new Set(rv.map(r=>r.userName))].join(', ');
+    rows+=`<div class="it"><div class="grow"><div class="d">${esc(a.name)} · <b style="color:${pc>=95?'var(--g)':'var(--ora)'}">${pc}%</b></div>
+      <div style="height:6px;background:#eef2f0;border-radius:4px;margin:4px 0"><div style="height:6px;width:${pc}%;background:${pc>=95?'var(--g)':'var(--ora)'};border-radius:4px"></div></div>
+      <div class="c">${n} de ${PL.length} productos · ${esc(who)}${ts.length?' · '+fdt(ts[0]).slice(-5)+' a '+fdt(ts[ts.length-1]).slice(-5):''}${rit?' · '+rit.toFixed(1)+' prod/min':''}${fast?' · <b style="color:#dc2626">⚠️ muy rápido</b>':''}</div>
+      <div class="c">${mu?`Muestra verificada: <b style="color:${mu.fail?'#dc2626':'var(--g)'}">${mu.ok}/${mu.ok+mu.fail} correctos</b> (${esc(mu.userName)})`:'Muestra sin verificar'}</div></div>
+      ${S_.size?`<button class="btn sm pri" data-mu="${a.id}">🎯 Verificar</button>`:''}</div>`;}
+  let users='';for(const[nm,u]of U){u.t.sort((x,y)=>x-y);const min=u.t.length>1?(u.t[u.t.length-1]-u.t[0])/6e4:0;users+=`<div class="it"><div class="grow"><div class="d">${esc(nm)}</div><div class="c">${u.n} productos revisados · ${u.a.size} pasillo(s)${min?' · '+Math.round(min)+' min activos · '+(u.n/min).toFixed(1)+' prod/min':''}</div></div></div>`;}
+  return {rows,users};}
+function muSheet(a,R,today){const S_=new Set();for(const r of R)if(r.aisleId===a.id&&dayStr(r.start)===today)for(const k in (r.seen||{}))S_.add(k);
+  const pool=[...S_].map(s=>PR[BYSKU.get(String(s))]).filter(Boolean);for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}const smp=pool.slice(0,5);
+  const lot=s=>QS.lots().find(l=>l.sku===s&&dayStr(l.created)===today);const res={};
+  const sh=sheet(`<h2>🎯 Verificación por muestra</h2><div class="sub">${esc(a.name)} · ${smp.length} productos al azar de lo revisado hoy. Ve a la góndola y confirma cada uno.</div>
+   ${smp.map(x=>{const l=lot(x.sku);return `<div class="it"><div class="grow"><div class="d">${esc(x.desc)}</div><div class="c">${idC(x,x.sku)} · ${l?'registraron vence '+fdate(l.fv):'registrado como conforme'}</div></div><div class="row" style="gap:4px"><button class="btn sm" data-mk="${x.sku}" data-v="1">✓</button><button class="btn sm" data-mk="${x.sku}" data-v="0">✗</button></div></div>`;}).join('')}
+   <div class="row" style="margin-top:14px"><div class="grow"></div><button class="btn pri" id="muOk">Guardar verificación</button></div>`);
+  sh.querySelectorAll('[data-mk]').forEach(b=>b.onclick=()=>{res[b.dataset.mk]=b.dataset.v==='1';sh.querySelectorAll(`[data-mk="${b.dataset.mk}"]`).forEach(o=>{const on=o===b;o.style.background=on?(o.dataset.v==='1'?'var(--g)':'#dc2626'):'';o.style.color=on?'#fff':'';});});
+  sh.querySelector('#muOk').onclick=()=>{if(Object.keys(res).length<smp.length){toast('Marca ✓ o ✗ en todos','err');return;}const ok=Object.values(res).filter(Boolean).length;const id='mu|'+today+'|'+a.id;
+    const L=QS.aud().filter(x=>x.id!==id);L.unshift({id,t:'mu',day:today,aisleId:a.id,aisleName:a.name,ok,fail:smp.length-ok,items:smp.map(x=>({sku:x.sku,ok:res[x.sku]})),userName:ME.name,ts:Date.now()});QS.setAud(L);sh.remove();toast('Verificación guardada: '+ok+'/'+smp.length,'ok');vQAud();};}
 function audSheet(a,sub){const M=QS.aud();const today=dayStr(Date.now());const id=today+'|'+a.id+'|'+sub;const m=M.find(x=>x.id===id);
   const sh=sheet(`<h2>${esc(short(sub))}</h2><div class="sub">${esc(a.name)} · avance de hoy</div>
    <label class="f">Cuerpos avanzados (déjalo vacío si fue completo)</label><input class="inp" id="auC" placeholder="Ej.: 1 al 4" value="${esc(m?m.cuerpos||'':'')}">
